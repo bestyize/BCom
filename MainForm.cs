@@ -1,9 +1,11 @@
-﻿using System;
+﻿using BCom;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Text;
@@ -22,6 +24,7 @@ namespace BlueSerial
         private static SerialPort mSerialPort;
         private Thread receiveThread=null,scanComThread=null,periodSendThread;
         private delegate void SafeCallDelegate(string text);
+        private int sendByteCount = 0;
         public MainForm()
         {
             InitializeComponent();
@@ -129,10 +132,15 @@ namespace BlueSerial
             else {
                 if (cbox_hex_display.Checked)
                 {
+                    
                     tb_recv.AppendText(" " + convertToHexString((string)obj));
+                    label_recv_count.Text = "R:" + (tb_recv.Text.Length + 1) / 3;
                 }
                 else {
+                    
                     tb_recv.AppendText((string)obj);
+                    label_recv_count.Text = "R:" + tb_recv.Text.Length;
+
                 }
                 
             }
@@ -184,11 +192,13 @@ namespace BlueSerial
         private void Btn_clean_send_Click(object sender, EventArgs e)
         {
             tb_send.Text = "";
+            label_send_count.Text = "S:0";
         }
 
         private void Btn_send_Click(object sender, EventArgs e)
         {
             sendData();
+
         }
 
         private void sendData()
@@ -204,17 +214,20 @@ namespace BlueSerial
                         mSerialPort.Write(bytes, 0, bytes.Length);
                         byte[] newLine = { 0xd, 0xa };
                         mSerialPort.Write(newLine, 0, newLine.Length);
+                        sendByteCount += (bytes.Length + newLine.Length);
                     }
                 }
                 else if ((cbox_send_line.Checked == true) && (cbox_send_hex.Checked == false))
                 {
                     //发送普通字符串新行
                     mSerialPort.Write(tb_send.Text + "\r\n");
+                    sendByteCount += (tb_send.Text.Length + 2);
                 }
                 else if ((cbox_send_line.Checked == false) && (cbox_send_hex.Checked == false))
                 {
                     //发送普通字符串
                     mSerialPort.Write(tb_send.Text);
+                    sendByteCount += tb_send.Text.Length;
                 }
                 else if ((cbox_send_line.Checked == false) && (cbox_send_hex.Checked == true))
                 {
@@ -223,13 +236,16 @@ namespace BlueSerial
                     if (bytes != null)
                     {
                         mSerialPort.Write(bytes, 0, bytes.Length);
+                        sendByteCount += bytes.Length;
                     }
-
+                    
                 }
                 else
                 {
                     MessageBox.Show("不支持的操作！");
                 }
+                label_send_count.Text = "S:" + sendByteCount;
+
             }
             else
             {
@@ -339,8 +355,137 @@ namespace BlueSerial
             
         }
 
+        private void Ts_menu_about_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("BCom是一款免费开源的串口调试助手","关于");
+        }
+
+        private void Ts_menu_weixin_open_Click(object sender, EventArgs e)
+        {
+            WxForm wxForm = new WxForm();
+            wxForm.Show();
+        }
+
+        private void Ts_menu_git_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("https://github.com/bestyize/BCom");
+        }
+
+        private void Ts_menu_calc_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("calc");
+        }
+
+        private void Ts_menu_nodepad_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("notepad");
+        }
+
+        private void Ts_menu_cmd_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("cmd");
+        }
+
+        private void Ts_menu_regedit_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("regedit");
+        }
+
+        private void Ts_menu_screenshot_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start("snippingtool");
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("您的系统不支持");
+            }
+        }
+
+        private void Ts_menu_mspaint_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("mspaint");
+        }
+
+        private void Ts_menu_screenshot_tool_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("snippingtool");
+        }
+
+        private void Ts_menu_mind_paint_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("http://www.freedraw.xyz/");
+        }
+
+        private void Ts_menu_mode_Click(object sender, EventArgs e)
+        {
+            if (this.Width == 300)
+            {
+                this.Width = 730;
+                this.Height = 530;
+            }
+            else
+            {
+                this.Width = 300;
+                this.Height = 60;
+            }
+
+        }
+
+        private void Ts_menu_notepad_tool_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("notepad");
+        }
+
+        private void Ts_menu_save_as_Click(object sender, EventArgs e)
+        {
+            Stream mStream;
+            SaveFileDialog saveFileDialog = new SaveFileDialog();
+            saveFileDialog.InitialDirectory = "d:\\";
+            saveFileDialog.Filter = "ext files (*.txt)|*.txt|All files(*.*)|*>**";
+            saveFileDialog.FilterIndex = 1;
+            saveFileDialog.RestoreDirectory = true;
+            
+            if (saveFileDialog.ShowDialog()==DialogResult.OK&& saveFileDialog.FileName.Length > 0)
+            {
+                if ((mStream = saveFileDialog.OpenFile())!= null)
+                {
+                    StreamWriter writer = new StreamWriter(mStream);
+                    writer.Write(tb_recv.Text);
+                    writer.Flush();
+                    writer.Close();
+                    mStream.Close();
+                    MessageBox.Show("存储文件成功！", "温馨提示");
+                }
+              
+                
+            }
+        }
+
+        private void Ts_menu_open_file_Click(object sender, EventArgs e)
+        {
+            var fileContent = string.Empty;
+            var filePath = string.Empty;
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "txt files (*.txt)|*.txt|All files (*.*)|*.*";
+            openFileDialog.FilterIndex = 1;
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                filePath = openFileDialog.FileName;
+                var fileStream = openFileDialog.OpenFile();
+                StreamReader reader = new StreamReader(fileStream);
+                fileContent = reader.ReadToEnd();
+                reader.Close();
+                fileStream.Close();
+                tb_send.Text = fileContent;
+            }
+            
+        }
+
         private void periodSendTask()
         {
+            Control.CheckForIllegalCrossThreadCalls = false;
             while (true)
             {
                 sendData();
@@ -353,6 +498,7 @@ namespace BlueSerial
         private void Btn_clean_recv_Click(object sender, EventArgs e)
         {
             tb_recv.Text = "";
+            label_recv_count.Text = "R:0";
         }
     }
 }

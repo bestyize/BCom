@@ -53,18 +53,40 @@
             this.cbox_timer_send = new System.Windows.Forms.CheckBox();
             this.tb_period_send_time_ms = new System.Windows.Forms.TextBox();
             this.label8 = new System.Windows.Forms.Label();
+            this.menu_top = new System.Windows.Forms.MenuStrip();
+            this.ts_menu_help = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_about = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_git = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_weixin_open = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_tool = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_calc = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_nodepad = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_cmd = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_regedit = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_screenshot = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_mspaint = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_screenshot_tool = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_mind_paint = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_mode = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_notepad_tool = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_file = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_save_as = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_open_file = new System.Windows.Forms.ToolStripMenuItem();
+            this.label_recv_count = new System.Windows.Forms.Label();
+            this.label_send_count = new System.Windows.Forms.Label();
+            this.menu_top.SuspendLayout();
             this.SuspendLayout();
             // 
             // tb_recv
             // 
             this.tb_recv.BackColor = System.Drawing.Color.Black;
             this.tb_recv.ForeColor = System.Drawing.Color.Lime;
-            this.tb_recv.Location = new System.Drawing.Point(3, 3);
+            this.tb_recv.Location = new System.Drawing.Point(3, 28);
             this.tb_recv.Multiline = true;
             this.tb_recv.Name = "tb_recv";
             this.tb_recv.ReadOnly = true;
             this.tb_recv.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tb_recv.Size = new System.Drawing.Size(480, 313);
+            this.tb_recv.Size = new System.Drawing.Size(480, 288);
             this.tb_recv.TabIndex = 0;
             // 
             // tb_send
@@ -244,6 +266,8 @@
             // cbox_send_line
             // 
             this.cbox_send_line.AutoSize = true;
+            this.cbox_send_line.Checked = true;
+            this.cbox_send_line.CheckState = System.Windows.Forms.CheckState.Checked;
             this.cbox_send_line.Location = new System.Drawing.Point(93, 454);
             this.cbox_send_line.Name = "cbox_send_line";
             this.cbox_send_line.Size = new System.Drawing.Size(72, 16);
@@ -289,12 +313,184 @@
             this.label8.TabIndex = 23;
             this.label8.Text = "ms";
             // 
+            // menu_top
+            // 
+            this.menu_top.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.ts_menu_file,
+            this.ts_menu_tool,
+            this.ts_menu_screenshot_tool,
+            this.ts_menu_notepad_tool,
+            this.ts_menu_mind_paint,
+            this.ts_menu_mode,
+            this.ts_menu_help});
+            this.menu_top.Location = new System.Drawing.Point(0, 0);
+            this.menu_top.Name = "menu_top";
+            this.menu_top.Size = new System.Drawing.Size(718, 25);
+            this.menu_top.TabIndex = 24;
+            // 
+            // ts_menu_help
+            // 
+            this.ts_menu_help.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.ts_menu_git,
+            this.ts_menu_weixin_open,
+            this.ts_menu_about});
+            this.ts_menu_help.Name = "ts_menu_help";
+            this.ts_menu_help.Size = new System.Drawing.Size(44, 21);
+            this.ts_menu_help.Text = "帮助";
+            // 
+            // ts_menu_about
+            // 
+            this.ts_menu_about.Name = "ts_menu_about";
+            this.ts_menu_about.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_about.Text = "关于";
+            this.ts_menu_about.Click += new System.EventHandler(this.Ts_menu_about_Click);
+            // 
+            // ts_menu_git
+            // 
+            this.ts_menu_git.Name = "ts_menu_git";
+            this.ts_menu_git.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_git.Text = "开源地址";
+            this.ts_menu_git.Click += new System.EventHandler(this.Ts_menu_git_Click);
+            // 
+            // ts_menu_weixin_open
+            // 
+            this.ts_menu_weixin_open.Name = "ts_menu_weixin_open";
+            this.ts_menu_weixin_open.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_weixin_open.Text = "微信公众号";
+            this.ts_menu_weixin_open.Click += new System.EventHandler(this.Ts_menu_weixin_open_Click);
+            // 
+            // ts_menu_tool
+            // 
+            this.ts_menu_tool.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.ts_menu_calc,
+            this.ts_menu_nodepad,
+            this.ts_menu_cmd,
+            this.ts_menu_regedit,
+            this.ts_menu_screenshot,
+            this.ts_menu_mspaint});
+            this.ts_menu_tool.Name = "ts_menu_tool";
+            this.ts_menu_tool.Size = new System.Drawing.Size(44, 21);
+            this.ts_menu_tool.Text = "工具";
+            // 
+            // ts_menu_calc
+            // 
+            this.ts_menu_calc.Name = "ts_menu_calc";
+            this.ts_menu_calc.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_calc.Text = "计算器";
+            this.ts_menu_calc.Click += new System.EventHandler(this.Ts_menu_calc_Click);
+            // 
+            // ts_menu_nodepad
+            // 
+            this.ts_menu_nodepad.Name = "ts_menu_nodepad";
+            this.ts_menu_nodepad.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_nodepad.Text = "记事本";
+            this.ts_menu_nodepad.Click += new System.EventHandler(this.Ts_menu_nodepad_Click);
+            // 
+            // ts_menu_cmd
+            // 
+            this.ts_menu_cmd.Name = "ts_menu_cmd";
+            this.ts_menu_cmd.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_cmd.Text = "命令行";
+            this.ts_menu_cmd.Click += new System.EventHandler(this.Ts_menu_cmd_Click);
+            // 
+            // ts_menu_regedit
+            // 
+            this.ts_menu_regedit.Name = "ts_menu_regedit";
+            this.ts_menu_regedit.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_regedit.Text = "注册表";
+            this.ts_menu_regedit.Click += new System.EventHandler(this.Ts_menu_regedit_Click);
+            // 
+            // ts_menu_screenshot
+            // 
+            this.ts_menu_screenshot.Name = "ts_menu_screenshot";
+            this.ts_menu_screenshot.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_screenshot.Text = "截图";
+            this.ts_menu_screenshot.Click += new System.EventHandler(this.Ts_menu_screenshot_Click);
+            // 
+            // ts_menu_mspaint
+            // 
+            this.ts_menu_mspaint.Name = "ts_menu_mspaint";
+            this.ts_menu_mspaint.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_mspaint.Text = "画图";
+            this.ts_menu_mspaint.Click += new System.EventHandler(this.Ts_menu_mspaint_Click);
+            // 
+            // ts_menu_screenshot_tool
+            // 
+            this.ts_menu_screenshot_tool.Name = "ts_menu_screenshot_tool";
+            this.ts_menu_screenshot_tool.Size = new System.Drawing.Size(44, 21);
+            this.ts_menu_screenshot_tool.Text = "截图";
+            this.ts_menu_screenshot_tool.Click += new System.EventHandler(this.Ts_menu_screenshot_tool_Click);
+            // 
+            // ts_menu_mind_paint
+            // 
+            this.ts_menu_mind_paint.Name = "ts_menu_mind_paint";
+            this.ts_menu_mind_paint.Size = new System.Drawing.Size(68, 21);
+            this.ts_menu_mind_paint.Text = "思维导图";
+            this.ts_menu_mind_paint.Click += new System.EventHandler(this.Ts_menu_mind_paint_Click);
+            // 
+            // ts_menu_mode
+            // 
+            this.ts_menu_mode.Name = "ts_menu_mode";
+            this.ts_menu_mode.Size = new System.Drawing.Size(68, 21);
+            this.ts_menu_mode.Text = "工具模式";
+            this.ts_menu_mode.Click += new System.EventHandler(this.Ts_menu_mode_Click);
+            // 
+            // ts_menu_notepad_tool
+            // 
+            this.ts_menu_notepad_tool.Name = "ts_menu_notepad_tool";
+            this.ts_menu_notepad_tool.Size = new System.Drawing.Size(56, 21);
+            this.ts_menu_notepad_tool.Text = "记事本";
+            this.ts_menu_notepad_tool.Click += new System.EventHandler(this.Ts_menu_notepad_tool_Click);
+            // 
+            // ts_menu_file
+            // 
+            this.ts_menu_file.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.ts_menu_open_file,
+            this.ts_menu_save_as});
+            this.ts_menu_file.Name = "ts_menu_file";
+            this.ts_menu_file.Size = new System.Drawing.Size(44, 21);
+            this.ts_menu_file.Text = "文件";
+            // 
+            // ts_menu_save_as
+            // 
+            this.ts_menu_save_as.Name = "ts_menu_save_as";
+            this.ts_menu_save_as.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_save_as.Text = "另存为";
+            this.ts_menu_save_as.Click += new System.EventHandler(this.Ts_menu_save_as_Click);
+            // 
+            // ts_menu_open_file
+            // 
+            this.ts_menu_open_file.Name = "ts_menu_open_file";
+            this.ts_menu_open_file.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_open_file.Text = "打开";
+            this.ts_menu_open_file.Click += new System.EventHandler(this.Ts_menu_open_file_Click);
+            // 
+            // label_recv_count
+            // 
+            this.label_recv_count.AutoSize = true;
+            this.label_recv_count.Location = new System.Drawing.Point(357, 458);
+            this.label_recv_count.Name = "label_recv_count";
+            this.label_recv_count.Size = new System.Drawing.Size(23, 12);
+            this.label_recv_count.TabIndex = 25;
+            this.label_recv_count.Text = "R:0";
+            // 
+            // label_send_count
+            // 
+            this.label_send_count.AutoSize = true;
+            this.label_send_count.Location = new System.Drawing.Point(426, 458);
+            this.label_send_count.Name = "label_send_count";
+            this.label_send_count.Size = new System.Drawing.Size(23, 12);
+            this.label_send_count.TabIndex = 26;
+            this.label_send_count.Text = "S:0";
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.White;
             this.ClientSize = new System.Drawing.Size(718, 491);
+            this.Controls.Add(this.label_send_count);
+            this.Controls.Add(this.label_recv_count);
             this.Controls.Add(this.label8);
             this.Controls.Add(this.tb_period_send_time_ms);
             this.Controls.Add(this.cbox_timer_send);
@@ -319,10 +515,15 @@
             this.Controls.Add(this.cb_com_list);
             this.Controls.Add(this.tb_send);
             this.Controls.Add(this.tb_recv);
+            this.Controls.Add(this.menu_top);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
+            this.MainMenuStrip = this.menu_top;
+            this.MaximizeBox = false;
             this.Name = "MainForm";
             this.Text = "BCom";
+            this.menu_top.ResumeLayout(false);
+            this.menu_top.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -353,6 +554,27 @@
         private System.Windows.Forms.CheckBox cbox_timer_send;
         private System.Windows.Forms.TextBox tb_period_send_time_ms;
         private System.Windows.Forms.Label label8;
+        private System.Windows.Forms.MenuStrip menu_top;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_help;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_about;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_git;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_weixin_open;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_tool;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_calc;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_nodepad;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_cmd;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_regedit;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_screenshot;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_mspaint;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_screenshot_tool;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_mind_paint;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_mode;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_notepad_tool;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_file;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_save_as;
+        private System.Windows.Forms.ToolStripMenuItem ts_menu_open_file;
+        private System.Windows.Forms.Label label_recv_count;
+        private System.Windows.Forms.Label label_send_count;
     }
 }
 
