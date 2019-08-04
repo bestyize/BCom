@@ -1,0 +1,10 @@
+C:\Users\yize\source\repos\BlueSerial\bin\Debug\BlueSerial.exe.config
+C:\Users\yize\source\repos\BlueSerial\bin\Debug\BlueSerial.exe
+C:\Users\yize\source\repos\BlueSerial\bin\Debug\BlueSerial.pdb
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BlueSerial.csprojAssemblyReference.cache
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BlueSerial.MainForm.resources
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BlueSerial.Properties.Resources.resources
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BlueSerial.csproj.GenerateResource.cache
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BlueSerial.csproj.CoreCompileInputs.cache
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BlueSerial.exe
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BlueSerial.pdb

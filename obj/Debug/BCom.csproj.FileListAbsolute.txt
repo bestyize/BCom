@@ -1,0 +1,9 @@
+C:\Users\yize\source\repos\BlueSerial\bin\Debug\BCom.exe.config
+C:\Users\yize\source\repos\BlueSerial\bin\Debug\BCom.exe
+C:\Users\yize\source\repos\BlueSerial\bin\Debug\BCom.pdb
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BlueSerial.MainForm.resources
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BCom.Properties.Resources.resources
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BCom.csproj.GenerateResource.cache
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BCom.csproj.CoreCompileInputs.cache
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BCom.exe
+C:\Users\yize\source\repos\BlueSerial\obj\Debug\BCom.pdb
