@@ -54,10 +54,9 @@
             this.tb_period_send_time_ms = new System.Windows.Forms.TextBox();
             this.label8 = new System.Windows.Forms.Label();
             this.menu_top = new System.Windows.Forms.MenuStrip();
-            this.ts_menu_help = new System.Windows.Forms.ToolStripMenuItem();
-            this.ts_menu_about = new System.Windows.Forms.ToolStripMenuItem();
-            this.ts_menu_git = new System.Windows.Forms.ToolStripMenuItem();
-            this.ts_menu_weixin_open = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_file = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_open_file = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_save_as = new System.Windows.Forms.ToolStripMenuItem();
             this.ts_menu_tool = new System.Windows.Forms.ToolStripMenuItem();
             this.ts_menu_calc = new System.Windows.Forms.ToolStripMenuItem();
             this.ts_menu_nodepad = new System.Windows.Forms.ToolStripMenuItem();
@@ -66,14 +65,17 @@
             this.ts_menu_screenshot = new System.Windows.Forms.ToolStripMenuItem();
             this.ts_menu_mspaint = new System.Windows.Forms.ToolStripMenuItem();
             this.ts_menu_screenshot_tool = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_notepad_tool = new System.Windows.Forms.ToolStripMenuItem();
             this.ts_menu_mind_paint = new System.Windows.Forms.ToolStripMenuItem();
             this.ts_menu_mode = new System.Windows.Forms.ToolStripMenuItem();
-            this.ts_menu_notepad_tool = new System.Windows.Forms.ToolStripMenuItem();
-            this.ts_menu_file = new System.Windows.Forms.ToolStripMenuItem();
-            this.ts_menu_save_as = new System.Windows.Forms.ToolStripMenuItem();
-            this.ts_menu_open_file = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_help = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_git = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_weixin_open = new System.Windows.Forms.ToolStripMenuItem();
+            this.ts_menu_about = new System.Windows.Forms.ToolStripMenuItem();
             this.label_recv_count = new System.Windows.Forms.Label();
             this.label_send_count = new System.Windows.Forms.Label();
+            this.cbox_rts = new System.Windows.Forms.CheckBox();
+            this.cbox_dtr = new System.Windows.Forms.CheckBox();
             this.menu_top.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -86,7 +88,7 @@
             this.tb_recv.Name = "tb_recv";
             this.tb_recv.ReadOnly = true;
             this.tb_recv.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tb_recv.Size = new System.Drawing.Size(480, 288);
+            this.tb_recv.Size = new System.Drawing.Size(499, 288);
             this.tb_recv.TabIndex = 0;
             // 
             // tb_send
@@ -95,7 +97,7 @@
             this.tb_send.Multiline = true;
             this.tb_send.Name = "tb_send";
             this.tb_send.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.tb_send.Size = new System.Drawing.Size(480, 100);
+            this.tb_send.Size = new System.Drawing.Size(499, 100);
             this.tb_send.TabIndex = 1;
             // 
             // cb_com_list
@@ -214,7 +216,7 @@
             // 
             // btn_send
             // 
-            this.btn_send.Location = new System.Drawing.Point(500, 347);
+            this.btn_send.Location = new System.Drawing.Point(510, 347);
             this.btn_send.Name = "btn_send";
             this.btn_send.Size = new System.Drawing.Size(75, 24);
             this.btn_send.TabIndex = 14;
@@ -224,7 +226,7 @@
             // 
             // btn_clean_send
             // 
-            this.btn_clean_send.Location = new System.Drawing.Point(500, 423);
+            this.btn_clean_send.Location = new System.Drawing.Point(510, 423);
             this.btn_clean_send.Name = "btn_clean_send";
             this.btn_clean_send.Size = new System.Drawing.Size(75, 24);
             this.btn_clean_send.TabIndex = 15;
@@ -278,11 +280,11 @@
             // label7
             // 
             this.label7.AutoSize = true;
-            this.label7.Location = new System.Drawing.Point(628, 470);
+            this.label7.Location = new System.Drawing.Point(599, 470);
             this.label7.Name = "label7";
-            this.label7.Size = new System.Drawing.Size(77, 12);
+            this.label7.Size = new System.Drawing.Size(107, 12);
             this.label7.TabIndex = 20;
-            this.label7.Text = "串口调试助手";
+            this.label7.Text = "串口调试助手-亦泽";
             this.label7.TextAlign = System.Drawing.ContentAlignment.TopCenter;
             // 
             // cbox_timer_send
@@ -328,36 +330,28 @@
             this.menu_top.Size = new System.Drawing.Size(718, 25);
             this.menu_top.TabIndex = 24;
             // 
-            // ts_menu_help
+            // ts_menu_file
             // 
-            this.ts_menu_help.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.ts_menu_git,
-            this.ts_menu_weixin_open,
-            this.ts_menu_about});
-            this.ts_menu_help.Name = "ts_menu_help";
-            this.ts_menu_help.Size = new System.Drawing.Size(44, 21);
-            this.ts_menu_help.Text = "帮助";
+            this.ts_menu_file.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.ts_menu_open_file,
+            this.ts_menu_save_as});
+            this.ts_menu_file.Name = "ts_menu_file";
+            this.ts_menu_file.Size = new System.Drawing.Size(44, 21);
+            this.ts_menu_file.Text = "文件";
             // 
-            // ts_menu_about
+            // ts_menu_open_file
             // 
-            this.ts_menu_about.Name = "ts_menu_about";
-            this.ts_menu_about.Size = new System.Drawing.Size(180, 22);
-            this.ts_menu_about.Text = "关于";
-            this.ts_menu_about.Click += new System.EventHandler(this.Ts_menu_about_Click);
+            this.ts_menu_open_file.Name = "ts_menu_open_file";
+            this.ts_menu_open_file.Size = new System.Drawing.Size(112, 22);
+            this.ts_menu_open_file.Text = "打开";
+            this.ts_menu_open_file.Click += new System.EventHandler(this.Ts_menu_open_file_Click);
             // 
-            // ts_menu_git
+            // ts_menu_save_as
             // 
-            this.ts_menu_git.Name = "ts_menu_git";
-            this.ts_menu_git.Size = new System.Drawing.Size(180, 22);
-            this.ts_menu_git.Text = "开源地址";
-            this.ts_menu_git.Click += new System.EventHandler(this.Ts_menu_git_Click);
-            // 
-            // ts_menu_weixin_open
-            // 
-            this.ts_menu_weixin_open.Name = "ts_menu_weixin_open";
-            this.ts_menu_weixin_open.Size = new System.Drawing.Size(180, 22);
-            this.ts_menu_weixin_open.Text = "微信公众号";
-            this.ts_menu_weixin_open.Click += new System.EventHandler(this.Ts_menu_weixin_open_Click);
+            this.ts_menu_save_as.Name = "ts_menu_save_as";
+            this.ts_menu_save_as.Size = new System.Drawing.Size(112, 22);
+            this.ts_menu_save_as.Text = "另存为";
+            this.ts_menu_save_as.Click += new System.EventHandler(this.Ts_menu_save_as_Click);
             // 
             // ts_menu_tool
             // 
@@ -375,42 +369,42 @@
             // ts_menu_calc
             // 
             this.ts_menu_calc.Name = "ts_menu_calc";
-            this.ts_menu_calc.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_calc.Size = new System.Drawing.Size(112, 22);
             this.ts_menu_calc.Text = "计算器";
             this.ts_menu_calc.Click += new System.EventHandler(this.Ts_menu_calc_Click);
             // 
             // ts_menu_nodepad
             // 
             this.ts_menu_nodepad.Name = "ts_menu_nodepad";
-            this.ts_menu_nodepad.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_nodepad.Size = new System.Drawing.Size(112, 22);
             this.ts_menu_nodepad.Text = "记事本";
             this.ts_menu_nodepad.Click += new System.EventHandler(this.Ts_menu_nodepad_Click);
             // 
             // ts_menu_cmd
             // 
             this.ts_menu_cmd.Name = "ts_menu_cmd";
-            this.ts_menu_cmd.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_cmd.Size = new System.Drawing.Size(112, 22);
             this.ts_menu_cmd.Text = "命令行";
             this.ts_menu_cmd.Click += new System.EventHandler(this.Ts_menu_cmd_Click);
             // 
             // ts_menu_regedit
             // 
             this.ts_menu_regedit.Name = "ts_menu_regedit";
-            this.ts_menu_regedit.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_regedit.Size = new System.Drawing.Size(112, 22);
             this.ts_menu_regedit.Text = "注册表";
             this.ts_menu_regedit.Click += new System.EventHandler(this.Ts_menu_regedit_Click);
             // 
             // ts_menu_screenshot
             // 
             this.ts_menu_screenshot.Name = "ts_menu_screenshot";
-            this.ts_menu_screenshot.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_screenshot.Size = new System.Drawing.Size(112, 22);
             this.ts_menu_screenshot.Text = "截图";
             this.ts_menu_screenshot.Click += new System.EventHandler(this.Ts_menu_screenshot_Click);
             // 
             // ts_menu_mspaint
             // 
             this.ts_menu_mspaint.Name = "ts_menu_mspaint";
-            this.ts_menu_mspaint.Size = new System.Drawing.Size(180, 22);
+            this.ts_menu_mspaint.Size = new System.Drawing.Size(112, 22);
             this.ts_menu_mspaint.Text = "画图";
             this.ts_menu_mspaint.Click += new System.EventHandler(this.Ts_menu_mspaint_Click);
             // 
@@ -420,6 +414,13 @@
             this.ts_menu_screenshot_tool.Size = new System.Drawing.Size(44, 21);
             this.ts_menu_screenshot_tool.Text = "截图";
             this.ts_menu_screenshot_tool.Click += new System.EventHandler(this.Ts_menu_screenshot_tool_Click);
+            // 
+            // ts_menu_notepad_tool
+            // 
+            this.ts_menu_notepad_tool.Name = "ts_menu_notepad_tool";
+            this.ts_menu_notepad_tool.Size = new System.Drawing.Size(56, 21);
+            this.ts_menu_notepad_tool.Text = "记事本";
+            this.ts_menu_notepad_tool.Click += new System.EventHandler(this.Ts_menu_notepad_tool_Click);
             // 
             // ts_menu_mind_paint
             // 
@@ -432,38 +433,39 @@
             // 
             this.ts_menu_mode.Name = "ts_menu_mode";
             this.ts_menu_mode.Size = new System.Drawing.Size(68, 21);
-            this.ts_menu_mode.Text = "工具模式";
+            this.ts_menu_mode.Text = "精简模式";
             this.ts_menu_mode.Click += new System.EventHandler(this.Ts_menu_mode_Click);
             // 
-            // ts_menu_notepad_tool
+            // ts_menu_help
             // 
-            this.ts_menu_notepad_tool.Name = "ts_menu_notepad_tool";
-            this.ts_menu_notepad_tool.Size = new System.Drawing.Size(56, 21);
-            this.ts_menu_notepad_tool.Text = "记事本";
-            this.ts_menu_notepad_tool.Click += new System.EventHandler(this.Ts_menu_notepad_tool_Click);
+            this.ts_menu_help.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.ts_menu_git,
+            this.ts_menu_weixin_open,
+            this.ts_menu_about});
+            this.ts_menu_help.Name = "ts_menu_help";
+            this.ts_menu_help.Size = new System.Drawing.Size(44, 21);
+            this.ts_menu_help.Text = "帮助";
             // 
-            // ts_menu_file
+            // ts_menu_git
             // 
-            this.ts_menu_file.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.ts_menu_open_file,
-            this.ts_menu_save_as});
-            this.ts_menu_file.Name = "ts_menu_file";
-            this.ts_menu_file.Size = new System.Drawing.Size(44, 21);
-            this.ts_menu_file.Text = "文件";
+            this.ts_menu_git.Name = "ts_menu_git";
+            this.ts_menu_git.Size = new System.Drawing.Size(136, 22);
+            this.ts_menu_git.Text = "开源地址";
+            this.ts_menu_git.Click += new System.EventHandler(this.Ts_menu_git_Click);
             // 
-            // ts_menu_save_as
+            // ts_menu_weixin_open
             // 
-            this.ts_menu_save_as.Name = "ts_menu_save_as";
-            this.ts_menu_save_as.Size = new System.Drawing.Size(180, 22);
-            this.ts_menu_save_as.Text = "另存为";
-            this.ts_menu_save_as.Click += new System.EventHandler(this.Ts_menu_save_as_Click);
+            this.ts_menu_weixin_open.Name = "ts_menu_weixin_open";
+            this.ts_menu_weixin_open.Size = new System.Drawing.Size(136, 22);
+            this.ts_menu_weixin_open.Text = "微信公众号";
+            this.ts_menu_weixin_open.Click += new System.EventHandler(this.Ts_menu_weixin_open_Click);
             // 
-            // ts_menu_open_file
+            // ts_menu_about
             // 
-            this.ts_menu_open_file.Name = "ts_menu_open_file";
-            this.ts_menu_open_file.Size = new System.Drawing.Size(180, 22);
-            this.ts_menu_open_file.Text = "打开";
-            this.ts_menu_open_file.Click += new System.EventHandler(this.Ts_menu_open_file_Click);
+            this.ts_menu_about.Name = "ts_menu_about";
+            this.ts_menu_about.Size = new System.Drawing.Size(136, 22);
+            this.ts_menu_about.Text = "关于";
+            this.ts_menu_about.Click += new System.EventHandler(this.Ts_menu_about_Click);
             // 
             // label_recv_count
             // 
@@ -483,12 +485,36 @@
             this.label_send_count.TabIndex = 26;
             this.label_send_count.Text = "S:0";
             // 
+            // cbox_rts
+            // 
+            this.cbox_rts.AutoSize = true;
+            this.cbox_rts.Location = new System.Drawing.Point(510, 262);
+            this.cbox_rts.Name = "cbox_rts";
+            this.cbox_rts.Size = new System.Drawing.Size(42, 16);
+            this.cbox_rts.TabIndex = 27;
+            this.cbox_rts.Text = "RTS";
+            this.cbox_rts.UseVisualStyleBackColor = true;
+            this.cbox_rts.CheckedChanged += new System.EventHandler(this.Cbox_rts_CheckedChanged);
+            // 
+            // cbox_dtr
+            // 
+            this.cbox_dtr.AutoSize = true;
+            this.cbox_dtr.Location = new System.Drawing.Point(510, 300);
+            this.cbox_dtr.Name = "cbox_dtr";
+            this.cbox_dtr.Size = new System.Drawing.Size(42, 16);
+            this.cbox_dtr.TabIndex = 28;
+            this.cbox_dtr.Text = "DTR";
+            this.cbox_dtr.UseVisualStyleBackColor = true;
+            this.cbox_dtr.CheckedChanged += new System.EventHandler(this.Cbox_dtr_CheckedChanged);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.White;
             this.ClientSize = new System.Drawing.Size(718, 491);
+            this.Controls.Add(this.cbox_dtr);
+            this.Controls.Add(this.cbox_rts);
             this.Controls.Add(this.label_send_count);
             this.Controls.Add(this.label_recv_count);
             this.Controls.Add(this.label8);
@@ -575,6 +601,8 @@
         private System.Windows.Forms.ToolStripMenuItem ts_menu_open_file;
         private System.Windows.Forms.Label label_recv_count;
         private System.Windows.Forms.Label label_send_count;
+        private System.Windows.Forms.CheckBox cbox_rts;
+        private System.Windows.Forms.CheckBox cbox_dtr;
     }
 }
 

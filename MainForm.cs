@@ -198,7 +198,6 @@ namespace BlueSerial
         private void Btn_send_Click(object sender, EventArgs e)
         {
             sendData();
-
         }
 
         private void sendData()
@@ -357,7 +356,7 @@ namespace BlueSerial
 
         private void Ts_menu_about_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("BCom是一款免费开源的串口调试助手","关于");
+            MessageBox.Show("BCom是一款免费开源的串口调试助手","关于 BCom2.0");
         }
 
         private void Ts_menu_weixin_open_Click(object sender, EventArgs e)
@@ -420,15 +419,17 @@ namespace BlueSerial
 
         private void Ts_menu_mode_Click(object sender, EventArgs e)
         {
-            if (this.Width == 300)
+            if (this.Width == 400)
             {
                 this.Width = 730;
                 this.Height = 530;
+                ts_menu_mode.Text = "精简模式";
             }
             else
             {
-                this.Width = 300;
+                this.Width = 400;
                 this.Height = 60;
+                ts_menu_mode.Text = "高级模式";
             }
 
         }
@@ -483,6 +484,37 @@ namespace BlueSerial
             
         }
 
+        private void Cbox_rts_CheckedChanged(object sender, EventArgs e)
+        {
+            if (mSerialPort != null)
+            {
+                if (cbox_rts.Checked)
+                {
+                    mSerialPort.RtsEnable = true;
+                }
+                else
+                {
+                    mSerialPort.RtsEnable = false;
+                }
+            }
+        }
+
+        private void Cbox_dtr_CheckedChanged(object sender, EventArgs e)
+        {
+            if (mSerialPort != null)
+            {
+                if (cbox_dtr.Checked)
+                {
+                    mSerialPort.DtrEnable = true;
+                }
+                else 
+                {
+                    mSerialPort.DtrEnable = false;
+                }
+                
+            }
+        }
+
         private void periodSendTask()
         {
             Control.CheckForIllegalCrossThreadCalls = false;
@@ -490,7 +522,6 @@ namespace BlueSerial
             {
                 sendData();
                 Thread.Sleep(Convert.ToInt32(tb_period_send_time_ms.Text));
-                
             }
             
         }
