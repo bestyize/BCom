@@ -284,9 +284,15 @@ namespace BlueSerial
         {
             if (mSerialPort != null)
             {
-                mSerialPort.StopBits = stopBitList[cb_stop_list.SelectedIndex];
-                //mSerialPort.StopBits = stopBitList[cb_stop_list.SelectedIndex];
+                try
+                {
+                    mSerialPort.StopBits = stopBitList[cb_stop_list.SelectedIndex];
+                    //mSerialPort.StopBits = stopBitList[cb_stop_list.SelectedIndex];
+                }
+                catch (Exception)
+                {
 
+                }
             }
         }
 
