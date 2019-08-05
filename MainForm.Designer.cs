@@ -93,6 +93,7 @@
             // 
             // tb_send
             // 
+            this.tb_send.AllowDrop = true;
             this.tb_send.Location = new System.Drawing.Point(3, 347);
             this.tb_send.Multiline = true;
             this.tb_send.Name = "tb_send";
@@ -449,21 +450,21 @@
             // ts_menu_git
             // 
             this.ts_menu_git.Name = "ts_menu_git";
-            this.ts_menu_git.Size = new System.Drawing.Size(136, 22);
+            this.ts_menu_git.Size = new System.Drawing.Size(180, 22);
             this.ts_menu_git.Text = "开源地址";
             this.ts_menu_git.Click += new System.EventHandler(this.Ts_menu_git_Click);
             // 
             // ts_menu_weixin_open
             // 
             this.ts_menu_weixin_open.Name = "ts_menu_weixin_open";
-            this.ts_menu_weixin_open.Size = new System.Drawing.Size(136, 22);
+            this.ts_menu_weixin_open.Size = new System.Drawing.Size(180, 22);
             this.ts_menu_weixin_open.Text = "微信公众号";
             this.ts_menu_weixin_open.Click += new System.EventHandler(this.Ts_menu_weixin_open_Click);
             // 
             // ts_menu_about
             // 
             this.ts_menu_about.Name = "ts_menu_about";
-            this.ts_menu_about.Size = new System.Drawing.Size(136, 22);
+            this.ts_menu_about.Size = new System.Drawing.Size(180, 22);
             this.ts_menu_about.Text = "关于";
             this.ts_menu_about.Click += new System.EventHandler(this.Ts_menu_about_Click);
             // 
@@ -509,6 +510,7 @@
             // 
             // MainForm
             // 
+            this.AllowDrop = true;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.White;
@@ -548,6 +550,7 @@
             this.MaximizeBox = false;
             this.Name = "MainForm";
             this.Text = "BCom";
+            this.Load += new System.EventHandler(this.MainForm_Load);
             this.menu_top.ResumeLayout(false);
             this.menu_top.PerformLayout();
             this.ResumeLayout(false);

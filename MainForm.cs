@@ -1,9 +1,7 @@
 ﻿using BCom;
 using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
+
 using System.Drawing;
 using System.IO;
 using System.IO.Ports;
@@ -30,7 +28,7 @@ namespace BlueSerial
             InitializeComponent();
             initView();
             serialPortListInit();
-
+            
             scanComThread = new Thread(new ThreadStart(scanComTask));
             scanComThread.Start();
             
@@ -45,7 +43,24 @@ namespace BlueSerial
             cb_parity_list.DataSource = parityList;
             cb_stop_list.DataSource = stopBitList;
             cb_baud_list.SelectedIndex = 3;
+            this.AllowDrop = true;
+            this.DragEnter += new DragEventHandler(tvRecvDragEnterEventHandler);
             
+        }
+
+        private void tvRecvDragEnterEventHandler(object obj, DragEventArgs args)
+        {
+           
+            try
+            {
+                string dataString = (string)args.Data.GetData(DataFormats.StringFormat);
+                tb_send.Text = dataString;
+            }
+            catch
+            {
+
+            }
+
         }
 
         private void scanComTask()
@@ -319,6 +334,7 @@ namespace BlueSerial
                 tb_recv.Text = convertToHexString(tb_recv.Text);
             }
             else {
+                
                 tb_recv.Text = convertHexStringToCommonString(tb_recv.Text);
             }
         }
@@ -519,6 +535,11 @@ namespace BlueSerial
                 }
                 
             }
+        }
+
+        private void MainForm_Load(object sender, EventArgs e)
+        {
+            this.AllowDrop = true;
         }
 
         private void periodSendTask()
