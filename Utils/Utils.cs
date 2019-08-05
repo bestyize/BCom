@@ -33,6 +33,10 @@ namespace BlueSerial.Utils
 
         public static string convertHexStringToCommonString(string hexString)
         {
+            if (hexString.Length == 0)
+            {
+                return "";
+            }
             string commonString = "";
 
             if (hexString.EndsWith(" "))
