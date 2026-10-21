@@ -1,42 +1,81 @@
 # BCom
-开源的多功能串口调试助手
-当前版本已升级为 .NET 10 LTS，提供 Windows x64 自包含便携包。旧版 Visual Studio 的“首选 32 位”选项不再适用。
 
+[简体中文](README.zh-CN.md)
 
-主界面
+**BCom** is a free and open-source cross-platform serial port debugging assistant, built with **.NET 10 LTS and Avalonia UI 12**.
 
-![主界面](screenshot/mainform.PNG)
+Supported desktop platforms: **Windows, macOS, and Linux**.
 
-工具栏
+## Features
 
-![工具栏](screenshot/mainform_tool.PNG)
+- Scan and select serial ports, baud rates, data bits, stop bits, and parity.
+- Send and receive text or hexadecimal data.
+- Append CRLF, repeatedly send at a configurable interval, and toggle RTS/DTR.
+- Open text files for sending and export received data.
+- Built-in English / Simplified Chinese interface; defaults to the operating system language and supports manual switching.
+- Launch platform-appropriate utilities (calculator, editor, terminal, screenshot tool) when installed.
 
-## 构建要求
+## Downloads
 
-BCom 已迁移到 **.NET 10 LTS**，使用 Windows Forms，因此仍仅支持 Windows。
+Download packages from [GitHub Releases](https://github.com/bestyize/BCom/releases) or the latest successful [GitHub Actions build](https://github.com/bestyize/BCom/actions/workflows/build.yml).
 
-- 本地开发：安装 [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)，推荐 Visual Studio 2026，选择“使用 .NET 的桌面开发”工作负载。
-- Windows x64 用户：可直接下载自包含 ZIP，无需单独安装 .NET Runtime。
+| Platform | Package | Notes |
+| --- | --- | --- |
+| Windows x64 | `BCom-*-win-x64.zip` | Extract and run `BCom.exe` |
+| macOS Apple Silicon | `BCom-*-osx-arm64.tar.gz` | Extract and open `BCom.app` |
+| macOS Intel | `BCom-*-osx-x64.tar.gz` | Extract and open `BCom.app` |
+| Linux x64 | `BCom-*-linux-x64.tar.gz` | Extract and run `./BCom` |
 
-本地构建：
+Builds are self-contained and do not require a separate .NET runtime. macOS builds are currently **unsigned and not notarized**; Gatekeeper may block first launch. On Linux, Avalonia requires a supported graphical desktop and appropriate native libraries. USB serial devices may require operating-system permissions (for example, membership in `dialout` on some Linux distributions). Available tools depend on your desktop environment.
 
-```powershell
-dotnet restore .\BCom.csproj
-dotnet build .\BCom.csproj -c Release
-dotnet publish .\BCom.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false
-```
+### Launching on macOS
 
-## Windows 自动打包
+After extracting, open `BCom.app` from Finder. If macOS blocks the unsigned app, use Finder's **Open** context-menu action and follow macOS instructions for opening software from an unidentified developer. Do not bypass security checks for a package you do not trust.
 
-GitHub Actions 在 Windows 上使用 .NET 10 SDK 构建并发布 **win-x64 自包含便携版**（不是安装器）。解压 ZIP 后运行 `BCom.exe`，不需要预装 .NET。
-
-- 向 `master` 推送提交、打开目标为 `master` 的 Pull Request，或在 **Actions → Build and package BCom → Run workflow** 手动触发。
-- 成功后，在对应 Actions 运行记录底部的 **Artifacts** 下载 `bcom-win-x64`，其中包含 `BCom-*-win-x64.zip`。
-- 推送以 `v` 开头的标签（如 `v2.0.1`）时自动创建或更新 GitHub Release，并上传 ZIP。
+### Launching on Linux
 
 ```bash
-git tag v2.0.1
-git push origin v2.0.1
+tar -xzf BCom-*-linux-x64.tar.gz
+cd BCom
+chmod +x BCom
+./BCom
 ```
 
-> 此升级不意味着跨平台支持；Windows Forms 仍需要 Windows。请使用兼容的 64 位 Windows 系统。
+The default Linux backend needs X11 and related native libraries; see [Avalonia supported platforms](https://docs.avaloniaui.net/docs/supported-platforms).
+
+## Build from source
+
+Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
+
+```bash
+dotnet restore BCom.csproj
+dotnet run --project BCom.csproj
+dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false
+```
+
+Replace `<runtime-id>` with `win-x64`, `osx-arm64`, `osx-x64`, or `linux-x64`. The active application is in `CrossPlatform/`; the legacy WinForms source and form resources remain in the repository as a migration reference and are excluded from the build.
+
+## Localization
+
+The interface follows the operating system's language by default: Chinese-speaking systems use Simplified Chinese; other systems use English. Change it in the app's **Language** selector. The choice is saved in the user profile. Strings live in `CrossPlatform/I18n.cs` (English fallback and Simplified Chinese dictionary).
+
+## Automated builds and releases
+
+GitHub Actions builds all four platform packages on pushes to `master`, pull requests, and manual runs. Tagged releases (`v*`, for example `v2.1.0`) upload all successfully built packages to GitHub Releases.
+
+```bash
+git tag v2.1.0
+git push origin v2.1.0
+```
+
+## Legacy screenshots
+
+The following screenshots show the **original Windows Forms edition**, not the new Avalonia interface.
+
+![Legacy main window](screenshot/mainform.PNG)
+
+![Legacy toolbar](screenshot/mainform_tool.PNG)
+
+## License
+
+See [LICENSE](LICENSE).
