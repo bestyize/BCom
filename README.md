@@ -11,18 +11,32 @@
 
 ![工具栏](screenshot/mainform_tool.PNG)
 
+## 构建要求
+
+BCom 已迁移到 **.NET 10 LTS**，使用 Windows Forms，因此仍仅支持 Windows。
+
+- 本地开发：安装 [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)，推荐 Visual Studio 2026，选择“使用 .NET 的桌面开发”工作负载。
+- Windows x64 用户：可直接下载自包含 ZIP，无需单独安装 .NET Runtime。
+
+本地构建：
+
+```powershell
+dotnet restore .\BCom.csproj
+dotnet build .\BCom.csproj -c Release
+dotnet publish .\BCom.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false
+```
+
 ## Windows 自动打包
 
-项目基于 **.NET Framework 4.7.2 / Windows Forms**，使用 GitHub Actions 在 Windows 上编译 Release 版本，并生成可直接解压使用的 ZIP（不是安装程序）。
+GitHub Actions 在 Windows 上使用 .NET 10 SDK 构建并发布 **win-x64 自包含便携版**（不是安装器）。解压 ZIP 后运行 `BCom.exe`，不需要预装 .NET。
 
-- 向 `master` 推送提交或提交目标为 `master` 的 Pull Request 后自动构建；也可以在 **Actions → Build and package BCom → Run workflow** 手动触发。
-- 构建成功后，在对应的 Actions 运行记录底部 **Artifacts** 中下载 `bcom-windows`；其中包含 `BCom-*-windows.zip`。
-- 推送以 `v` 开头的标签（如 `v2.0.1`）时，将自动生成或更新同名 GitHub Release，并附上 Windows ZIP 安装包。
-- 下载后解压 ZIP，在已安装 **.NET Framework 4.7.2 或更高兼容版本（4.x）** 的 Windows 系统上运行 `BCom.exe`。请保留压缩包中其他文件与其同目录。
-
-打标签示例：
+- 向 `master` 推送提交、打开目标为 `master` 的 Pull Request，或在 **Actions → Build and package BCom → Run workflow** 手动触发。
+- 成功后，在对应 Actions 运行记录底部的 **Artifacts** 下载 `bcom-win-x64`，其中包含 `BCom-*-win-x64.zip`。
+- 推送以 `v` 开头的标签（如 `v2.0.1`）时自动创建或更新 GitHub Release，并上传 ZIP。
 
 ```bash
 git tag v2.0.1
 git push origin v2.0.1
 ```
+
+> 此升级不意味着跨平台支持；Windows Forms 仍需要 Windows。请使用兼容的 64 位 Windows 系统。
