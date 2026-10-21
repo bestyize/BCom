@@ -1,4 +1,4 @@
-name: Build and package BCom
+name: Build and release BCom
 
 on:
   push:
@@ -10,6 +10,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: bcom-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -35,18 +39,38 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Determine build version
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$$ ]]; then
+              echo "Invalid version tag: $GITHUB_REF_NAME (expected vMAJOR.MINOR.PATCH)" >&2
+              exit 1
+            fi
+            label="$GITHUB_REF_NAME"
+          else
+            version="$(dotnet msbuild BCom.csproj -getProperty:Version)"
+            label="build-$GITHUB_RUN_NUMBER"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+
       - name: Publish self-contained application
         shell: bash
         run: |
           set -euo pipefail
           dotnet publish BCom.csproj -c Release -r "${{ matrix.rid }}" \
             --self-contained true --output publish \
-            -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true \
-            -p:PublishTrimmed=false
+            -p:Version="${{ steps.metadata.outputs.version }}" \
+            -p:UseAppHost=true -p:PublishSingleFile=true \
+            -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            test -f publish/BCom.exe
+            test -s publish/BCom.exe
           else
-            test -f publish/BCom
+            test -s publish/BCom
             chmod +x publish/BCom
           fi
           find publish -type f -name '*.pdb' -delete
@@ -66,56 +90,50 @@ jobs:
             exit 1
           fi
 
-      - name: Package portable Windows ZIP
+      - name: Package and verify Windows ZIP
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          $name = "BCom-${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}-${{ matrix.rid }}.zip"
+          $name = "BCom-${{ steps.metadata.outputs.label }}-${{ matrix.rid }}.zip"
           Compress-Archive -Path publish/* -DestinationPath "dist/$name" -Force
+          New-Item -ItemType Directory -Path verify -Force | Out-Null
+          Expand-Archive -Path "dist/$name" -DestinationPath verify -Force
+          if (!(Test-Path "verify/BCom.exe")) { throw "Packaged BCom.exe is missing" }
+          $original = (Get-FileHash publish/BCom.exe -Algorithm SHA256).Hash
+          $extracted = (Get-FileHash verify/BCom.exe -Algorithm SHA256).Hash
+          if ($original -ne $extracted) { throw "Windows ZIP extraction checksum mismatch" }
 
-      - name: Package macOS app bundle
+      - name: Package and verify macOS application
         if: runner.os == 'macOS'
         shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p package/BCom.app/Contents/MacOS dist
-          cp -R publish/. package/BCom.app/Contents/MacOS/
-          cat > package/BCom.app/Contents/Info.plist <<'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CFBundleExecutable</key><string>BCom</string>
-            <key>CFBundleIdentifier</key><string>io.github.bestyize.bcom</string>
-            <key>CFBundleName</key><string>BCom</string>
-            <key>CFBundleDisplayName</key><string>BCom</string>
-            <key>CFBundlePackageType</key><string>APPL</string>
-            <key>CFBundleShortVersionString</key><string>2.1.0</string>
-            <key>CFBundleVersion</key><string>1</string>
-            <key>NSHighResolutionCapable</key><true/>
-          </dict>
-          </plist>
-          PLIST
-          chmod +x package/BCom.app/Contents/MacOS/BCom
-          label="${GITHUB_REF_NAME}"
-          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then label="build-${GITHUB_RUN_NUMBER}"; fi
-          tar -czf "dist/BCom-${label}-${{ matrix.rid }}.tar.gz" -C package BCom.app
+        env:
+          BCOM_RID: ${{ matrix.rid }}
+          BCOM_VERSION: ${{ steps.metadata.outputs.version }}
+          BCOM_LABEL: ${{ steps.metadata.outputs.label }}
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: bash .github/scripts/package-macos.sh
 
-      - name: Package Linux tarball
+      - name: Package and verify Linux tarball
         if: runner.os == 'Linux'
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p package/BCom dist
-          cp -R publish/. package/BCom/
+          cp -a publish/. package/BCom/
           chmod +x package/BCom/BCom
-          label="${GITHUB_REF_NAME}"
-          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then label="build-${GITHUB_RUN_NUMBER}"; fi
-          tar -czf "dist/BCom-${label}-${{ matrix.rid }}.tar.gz" -C package BCom
+          tar -czf "dist/BCom-${{ steps.metadata.outputs.label }}-${{ matrix.rid }}.tar.gz" -C package BCom
+          mkdir -p verify
+          tar -xzf "dist/BCom-${{ steps.metadata.outputs.label }}-${{ matrix.rid }}.tar.gz" -C verify
+          test -x verify/BCom/BCom
+          cmp -s publish/BCom verify/BCom/BCom
 
-      - name: Upload packaged artifact
+      - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
           name: bcom-${{ matrix.rid }}
@@ -124,10 +142,10 @@ jobs:
           retention-days: 30
 
   release:
-    name: Publish GitHub Release
+    name: Publish verified GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -137,6 +155,29 @@ jobs:
           pattern: bcom-*
           merge-multiple: true
           path: dist
+
+      - name: Validate release assets and write SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          tag="$GITHUB_REF_NAME"
+          test -s "dist/BCom-$tag-win-x64.zip"
+          test -s "dist/BCom-$tag-linux-x64.tar.gz"
+          mac=(dist/BCom-"$tag"-osx-*.dmg)
+          if (( ${#mac[@]} != 0 && ${#mac[@]} != 2 )); then
+            echo "Expected both macOS architectures to be notarized, or neither" >&2
+            exit 1
+          fi
+          if (( ${#mac[@]} == 0 )); then
+            echo "::warning::macOS release packages omitted: Developer ID signing/notarization credentials are not configured."
+          fi
+          packages=("dist/BCom-$tag-win-x64.zip" "dist/BCom-$tag-linux-x64.tar.gz" "${mac[@]}")
+          for file in "${packages[@]}"; do test -s "$file"; done
+          ( cd dist && for file in "${packages[@]}"; do sha256sum "${file##*/}"; done ) > dist/SHA256SUMS.txt
+          printf '%s\n' "${packages[@]}" >> "$GITHUB_STEP_SUMMARY"
+          echo "ASSET_COUNT=${#packages[@]}" >> "$GITHUB_ENV"
+
       - name: Create or update GitHub Release
         shell: bash
         env:
@@ -145,14 +186,11 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          packages=(dist/*)
-          if (( ${#packages[@]} != 4 )); then
-            echo "Expected 4 platform packages, got ${#packages[@]}" >&2
-            exit 1
-          fi
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+          packages=(dist/*-win-x64.zip dist/*-linux-x64.tar.gz dist/*-osx-*.dmg)
+          packages+=(dist/SHA256SUMS.txt)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${packages[@]}" --clobber
           else
             gh release create "$GITHUB_REF_NAME" "${packages[@]}" \
-              --title "$GITHUB_REF_NAME" --generate-notes
+              --title "BCom $GITHUB_REF_NAME" --generate-notes --verify-tag
           fi
