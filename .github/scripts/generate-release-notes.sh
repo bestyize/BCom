@@ -13,31 +13,35 @@ mkdir -p dist
 cat > dist/RELEASE_NOTES.md <<EOF
 ## BCom ${tag}
 
-跨平台串口调试助手（.NET 10 LTS + Avalonia UI 12），支持 Windows、macOS 和 Linux。
+Cross-platform serial communication and debugging assistant built with **.NET 10 LTS and Avalonia UI 12**, supporting **Windows, macOS, and Linux**.
 
-### 📦 安装包下载 / Downloads
+### 📦 Downloads
 
-| 平台 / Platform | 下载文件 / Package | 说明 / Notes |
+| Platform | Package | Notes |
 | :--- | :--- | :--- |
-| **Windows (x64)** | \`BCom-${tag}-win-x64.zip\` | 解压后直接运行 \`BCom.exe\` |
-| **macOS (Apple Silicon M系列)** | \`BCom-${tag}-osx-arm64.dmg\` | 双击打开 DMG，将 \`BCom.app\` 拖入 Applications |
-| **macOS (Intel x64)** | \`BCom-${tag}-osx-x64.dmg\` | 双击打开 DMG，将 \`BCom.app\` 拖入 Applications |
-| **Linux (x64)** | \`BCom-${tag}-linux-x64.tar.gz\` | 解压后终端运行 \`./BCom\` |
+| **Windows (x64)** | \`BCom-${tag}-win-x64.zip\` | Extract and run \`BCom.exe\` |
+| **macOS (Apple Silicon M-Series)** | \`BCom-${tag}-osx-arm64.dmg\` | Open DMG and drag \`BCom.app\` to Applications |
+| **macOS (Intel x86_64)** | \`BCom-${tag}-osx-x64.dmg\` | Open DMG and drag \`BCom.app\` to Applications |
+| **Linux (x64)** | \`BCom-${tag}-linux-x64.tar.gz\` | Extract and run \`./BCom\` |
+
+All packages are self-contained and do not require a pre-installed .NET runtime.
 
 ---
 
-### 🍎 macOS 首次运行提示“无法打开”或“已损坏”解决办法
-如果 macOS 提示应用已损坏或来自未识别的开发者（Gatekeeper 安全防护机制）：
-1. 打开 Mac 系统自带的 **终端 (Terminal)**；
-2. 复制并执行以下命令（清除下载隔离属性）：
+### 🍎 macOS First-Launch Notice (Gatekeeper)
+
+If macOS displays a warning that the application is damaged or from an unidentified developer:
+1. Open the built-in **Terminal** app.
+2. Run the following command to remove the quarantine flag:
    \`\`\`bash
    xattr -cr /Applications/BCom.app
    \`\`\`
-3. 再次在“应用程序”中双击 \`BCom.app\` 即可正常启动。
+3. Double-click \`BCom.app\` in Applications to launch normally. Alternatively, click **Open Anyway** in **System Settings -> Privacy & Security**.
 
 ---
 
-### 校验和 / SHA-256 Checksums
+### SHA-256 Checksums
+
 \`\`\`
 ${checksums}
 \`\`\`
