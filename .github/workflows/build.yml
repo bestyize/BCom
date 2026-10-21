@@ -67,7 +67,7 @@ jobs:
           set -euo pipefail
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
-            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$$ ]]; then
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
               echo "Invalid version tag: $GITHUB_REF_NAME (expected vMAJOR.MINOR.PATCH)" >&2
               exit 1
             fi
@@ -75,7 +75,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.publish_release }}" == "true" && -n "${{ inputs.tag_name }}" ]]; then
             label="${{ inputs.tag_name }}"
             version="${label#v}"
-            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$$ ]]; then
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
               echo "Invalid version tag: $label (expected vMAJOR.MINOR.PATCH)" >&2
               exit 1
             fi
