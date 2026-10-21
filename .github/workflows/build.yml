@@ -2,13 +2,10 @@ name: Build and package BCom
 
 on:
   push:
-    branches:
-      - master
-    tags:
-      - 'v*'
+    branches: [master]
+    tags: ['v*']
   pull_request:
-    branches:
-      - master
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -16,56 +13,98 @@ permissions:
 
 jobs:
   build:
-    name: Windows x64 (.NET 10)
-    runs-on: windows-2022
-
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            rid: win-x64
+          - os: macos-15
+            rid: osx-x64
+          - os: macos-15-arm64
+            rid: osx-arm64
+          - os: ubuntu-24.04
+            rid: linux-x64
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Publish self-contained Windows x64 build
+      - name: Publish self-contained application
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish BCom.csproj -c Release -r "${{ matrix.rid }}" \
+            --self-contained true --output publish \
+            -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true \
+            -p:PublishTrimmed=false
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            test -f publish/BCom.exe
+          else
+            test -f publish/BCom
+            chmod +x publish/BCom
+          fi
+          find publish -type f -name '*.pdb' -delete
+
+      - name: Package portable Windows ZIP
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $publishDir = Join-Path $env:RUNNER_TEMP 'bcom-publish'
-          dotnet publish .\BCom.csproj -c Release -r win-x64 --self-contained true --output $publishDir -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false
-          if ($LASTEXITCODE -ne 0) {
-            throw "dotnet publish failed with exit code $LASTEXITCODE"
-          }
-          if (-not (Test-Path (Join-Path $publishDir 'BCom.exe'))) {
-            throw 'Missing BCom.exe in publish directory'
-          }
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          $name = "BCom-${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}-${{ matrix.rid }}.zip"
+          Compress-Archive -Path publish/* -DestinationPath "dist/$name" -Force
 
-      - name: Create portable Windows ZIP
-        shell: pwsh
+      - name: Package macOS app bundle
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          $publishDir = Join-Path $env:RUNNER_TEMP 'bcom-publish'
-          $distDir = Join-Path $env:GITHUB_WORKSPACE 'dist'
+          set -euo pipefail
+          mkdir -p package/BCom.app/Contents/MacOS dist
+          cp -R publish/. package/BCom.app/Contents/MacOS/
+          cat > package/BCom.app/Contents/Info.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key><string>BCom</string>
+            <key>CFBundleIdentifier</key><string>io.github.bestyize.bcom</string>
+            <key>CFBundleName</key><string>BCom</string>
+            <key>CFBundleDisplayName</key><string>BCom</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>2.1.0</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          chmod +x package/BCom.app/Contents/MacOS/BCom
+          label="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then label="build-${GITHUB_RUN_NUMBER}"; fi
+          tar -czf "dist/BCom-${label}-${{ matrix.rid }}.tar.gz" -C package BCom.app
 
-          New-Item -ItemType Directory -Path $distDir -Force | Out-Null
-          Get-ChildItem -Path $publishDir -Recurse -File -Filter '*.pdb' | Remove-Item -Force
+      - name: Package Linux tarball
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package/BCom dist
+          cp -R publish/. package/BCom/
+          chmod +x package/BCom/BCom
+          label="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then label="build-${GITHUB_RUN_NUMBER}"; fi
+          tar -czf "dist/BCom-${label}-${{ matrix.rid }}.tar.gz" -C package BCom
 
-          $label = if ($env:GITHUB_REF_TYPE -eq 'tag') {
-            $env:GITHUB_REF_NAME
-          } else {
-            "build-$env:GITHUB_RUN_NUMBER"
-          }
-          $label = $label -replace '[^a-zA-Z0-9._-]', '-'
-          $archive = Join-Path $distDir "BCom-$label-win-x64.zip"
-          Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $archive -Force
-          Write-Host "Created $archive"
-
-      - name: Upload build artifact
+      - name: Upload packaged artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bcom-win-x64
-          path: dist/*.zip
+          name: bcom-${{ matrix.rid }}
+          path: dist/*
           if-no-files-found: error
           retention-days: 30
 
@@ -76,28 +115,27 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Download packaged ZIP
+      - name: Download platform archives
         uses: actions/download-artifact@v4
         with:
-          name: bcom-win-x64
+          pattern: bcom-*
+          merge-multiple: true
           path: dist
-
       - name: Create or update GitHub Release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-          packages=(dist/*.zip)
-          if (( ${#packages[@]} == 0 )); then
-            echo "No package ZIP was produced" >&2
+          packages=(dist/*)
+          if (( ${#packages[@]} != 4 )); then
+            echo "Expected 4 platform packages, got ${#packages[@]}" >&2
             exit 1
           fi
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${packages[@]}" --clobber
           else
             gh release create "$GITHUB_REF_NAME" "${packages[@]}" \
