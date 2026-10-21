@@ -189,8 +189,7 @@ public sealed class MainWindow : Window
         receiveHeader.Children.Add(clearReceive);
         left.Children.Add(receiveHeader);
 
-        _output.Watermark = I18n.T("ReceivePlaceholder");
-        _output.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+        _output.PlaceholderText = I18n.T("ReceivePlaceholder");
         Grid.SetRow(_output, 1);
         left.Children.Add(_output);
         var receiveFlags = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
@@ -200,8 +199,7 @@ public sealed class MainWindow : Window
         var sendTitle = Label("SendPanel", 14);
         Grid.SetRow(sendTitle, 3);
         left.Children.Add(sendTitle);
-        _input.Watermark = I18n.T("SendPlaceholder");
-        _input.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+        _input.PlaceholderText = I18n.T("SendPlaceholder");
         Grid.SetRow(_input, 4);
         left.Children.Add(_input);
         var sendActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 9 };
@@ -274,8 +272,8 @@ public sealed class MainWindow : Window
     private void RefreshLanguage()
     {
         foreach (var update in _translate) update();
-        _output.Watermark = I18n.T("ReceivePlaceholder");
-        _input.Watermark = I18n.T("SendPlaceholder");
+        _output.PlaceholderText = I18n.T("ReceivePlaceholder");
+        _input.PlaceholderText = I18n.T("SendPlaceholder");
         _openButton.Content = I18n.T(_port?.IsOpen == true ? "ClosePort" : "OpenPort");
         if (_modeMenu != null)
             _modeMenu.Header = I18n.T(_compact ? "ModeAdvanced" : "ModeCompact");
