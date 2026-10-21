@@ -26,6 +26,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CrossPlatform/**/*.cs" />
-    <AvaloniaResource Include="res/weixin.png" />
+    <AvaloniaResource Include="res/weixin.png" Condition="Exists('res/weixin.png')" />
   </ItemGroup>
 </Project>

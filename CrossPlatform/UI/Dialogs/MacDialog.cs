@@ -63,43 +63,51 @@ public static class MacDialog
 
     public static async Task ShowWeChatQrAsync(Window owner)
     {
-        using var bitmap = new Bitmap(AssetLoader.Open(new Uri("avares://BCom/res/weixin.png")));
-        var image = new Image { Source = bitmap, Height = 340, Stretch = Stretch.Uniform };
-
-        var window = new Window
+        try
         {
-            Title = I18n.T("QrTitle"),
-            Width = 430,
-            Height = 465,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Background = MacTheme.BgCard,
-            Content = new StackPanel
+            using var stream = AssetLoader.Open(new Uri("avares://BCom/res/weixin.png"));
+            using var bitmap = new Bitmap(stream);
+            var image = new Image { Source = bitmap, Height = 340, Stretch = Stretch.Uniform };
+
+            var window = new Window
             {
-                Margin = new Thickness(24),
-                Spacing = 16,
-                Children =
+                Title = I18n.T("QrTitle"),
+                Width = 430,
+                Height = 465,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = MacTheme.BgCard,
+                Content = new StackPanel
                 {
-                    new TextBlock
+                    Margin = new Thickness(24),
+                    Spacing = 16,
+                    Children =
                     {
-                        Text = I18n.T("QrSubtitle"),
-                        FontSize = 13,
-                        FontWeight = FontWeight.Medium,
-                        Foreground = MacTheme.TextSecondary,
-                        HorizontalAlignment = HorizontalAlignment.Center
-                    },
-                    new Border
-                    {
-                        BorderBrush = MacTheme.BorderMuted,
-                        BorderThickness = new Thickness(1),
-                        CornerRadius = new CornerRadius(8),
-                        Padding = new Thickness(10),
-                        Background = Brushes.White,
-                        Child = image
+                        new TextBlock
+                        {
+                            Text = I18n.T("QrSubtitle"),
+                            FontSize = 13,
+                            FontWeight = FontWeight.Medium,
+                            Foreground = MacTheme.TextSecondary,
+                            HorizontalAlignment = HorizontalAlignment.Center
+                        },
+                        new Border
+                        {
+                            BorderBrush = MacTheme.BorderMuted,
+                            BorderThickness = new Thickness(1),
+                            CornerRadius = new CornerRadius(8),
+                            Padding = new Thickness(10),
+                            Background = Brushes.White,
+                            Child = image
+                        }
                     }
                 }
-            }
-        };
+            };
 
-        await window.ShowDialog(owner);
+            await window.ShowDialog(owner);
+        }
+        catch (Exception)
+        {
+            await ShowAlertAsync(owner, I18n.T("NotSupported"), I18n.T("QrTitle"));
+        }
     }
 }
