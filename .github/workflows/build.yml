@@ -171,7 +171,7 @@ jobs:
 
   release:
     name: Publish verified GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release && inputs.tag_name != '')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release == true || github.event.inputs.publish_release == 'true'
     needs: build
     runs-on: ubuntu-24.04
     permissions:
