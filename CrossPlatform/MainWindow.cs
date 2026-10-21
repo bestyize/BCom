@@ -20,9 +20,28 @@ using Avalonia.Threading;
 
 namespace BCom.CrossPlatform;
 
-/// <summary>The same serial monitor UI and backend on Windows, macOS and Linux.</summary>
+/// <summary>
+/// Modern macOS-inspired serial port debugging assistant for Windows, macOS and Linux.
+/// </summary>
 public sealed class MainWindow : Window
 {
+    private static readonly FontFamily MonoFont = new("Menlo, Monaco, SF Mono, Consolas, Courier New, monospace");
+    private static readonly SolidColorBrush BgWindow = new(Color.Parse("#F2F4F7"));
+    private static readonly SolidColorBrush BgCard = new(Color.Parse("#FFFFFF"));
+    private static readonly SolidColorBrush BgSubtle = new(Color.Parse("#F8FAFC"));
+    private static readonly SolidColorBrush BgEditor = new(Color.Parse("#FAFBFD"));
+    private static readonly SolidColorBrush BorderMuted = new(Color.Parse("#E2E8F0"));
+    private static readonly SolidColorBrush BorderStrong = new(Color.Parse("#CBD5E1"));
+
+    private static readonly SolidColorBrush TextPrimary = new(Color.Parse("#0F172A"));
+    private static readonly SolidColorBrush TextSecondary = new(Color.Parse("#475569"));
+    private static readonly SolidColorBrush TextMuted = new(Color.Parse("#94A3B8"));
+
+    private static readonly SolidColorBrush AccentBlue = new(Color.Parse("#007AFF"));
+    private static readonly SolidColorBrush AccentGreen = new(Color.Parse("#34C759"));
+    private static readonly SolidColorBrush AccentRed = new(Color.Parse("#FF3B30"));
+    private static readonly SolidColorBrush StatusGray = new(Color.Parse("#94A3B8"));
+
     private readonly List<Action> _translate = new();
     private readonly List<byte> _received = new();
     private readonly ComboBox _ports = new();
@@ -31,18 +50,99 @@ public sealed class MainWindow : Window
     private readonly ComboBox _stopBits = new();
     private readonly ComboBox _parities = new();
     private readonly ComboBox _languages = new();
-    private readonly TextBox _input = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
-    private readonly TextBox _output = new() { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
-    private readonly TextBox _interval = new() { Text = "1000", Width = 90 };
-    private readonly CheckBox _showHex = new();
-    private readonly CheckBox _sendHex = new();
-    private readonly CheckBox _newline = new();
-    private readonly CheckBox _periodic = new();
-    private readonly CheckBox _rts = new();
-    private readonly CheckBox _dtr = new();
-    private readonly Button _openButton = new();
-    private readonly TextBlock _status = new();
-    private readonly TextBlock _counts = new();
+
+    private readonly TextBox _input = new()
+    {
+        AcceptsReturn = true,
+        TextWrapping = TextWrapping.Wrap,
+        FontFamily = MonoFont,
+        FontSize = 13,
+        Background = Brushes.White,
+        BorderBrush = BorderMuted,
+        BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(8),
+        Padding = new Thickness(10, 8),
+        MinHeight = 85
+    };
+
+    private readonly TextBox _output = new()
+    {
+        IsReadOnly = true,
+        AcceptsReturn = true,
+        TextWrapping = TextWrapping.Wrap,
+        FontFamily = MonoFont,
+        FontSize = 13,
+        Background = BgEditor,
+        BorderBrush = BorderMuted,
+        BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(8),
+        Padding = new Thickness(10, 8)
+    };
+
+    private readonly TextBox _interval = new()
+    {
+        Text = "1000",
+        Width = 75,
+        Height = 28,
+        FontFamily = MonoFont,
+        FontSize = 12,
+        BorderBrush = BorderMuted,
+        BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(6),
+        Padding = new Thickness(6, 3),
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    private readonly CheckBox _showHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly CheckBox _sendHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly CheckBox _newline = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly CheckBox _periodic = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly CheckBox _rts = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly CheckBox _dtr = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+
+    private readonly Button _openButton = new()
+    {
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        HorizontalContentAlignment = HorizontalAlignment.Center,
+        VerticalContentAlignment = VerticalAlignment.Center,
+        MinHeight = 40,
+        CornerRadius = new CornerRadius(9),
+        FontSize = 13.5,
+        FontWeight = FontWeight.Bold,
+        Foreground = Brushes.White,
+        Background = AccentBlue,
+        Cursor = new Cursor(StandardCursorType.Hand)
+    };
+
+    private readonly Border _statusDot = new()
+    {
+        Width = 8,
+        Height = 8,
+        CornerRadius = new CornerRadius(4),
+        Background = StatusGray,
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    private readonly TextBlock _statusPillText = new()
+    {
+        FontSize = 11.5,
+        FontWeight = FontWeight.SemiBold,
+        Foreground = TextSecondary,
+        VerticalAlignment = VerticalAlignment.Center,
+        Margin = new Thickness(6, 0, 0, 0)
+    };
+
+    private readonly TextBlock _status = new()
+    {
+        FontSize = 12,
+        Foreground = TextSecondary,
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    private readonly TextBlock _counts = new() { IsVisible = false };
+    private readonly TextBlock _rxCountBadge = new() { FontSize = 11.5, FontWeight = FontWeight.SemiBold, Foreground = new SolidColorBrush(Color.Parse("#16A34A")) };
+    private readonly TextBlock _txCountBadge = new() { FontSize = 11.5, FontWeight = FontWeight.SemiBold, Foreground = new SolidColorBrush(Color.Parse("#0284C7")) };
+
     private readonly Border _settingsPane = new();
     private readonly DispatcherTimer _scanner = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _sender = new();
@@ -60,13 +160,13 @@ public sealed class MainWindow : Window
 
     public MainWindow()
     {
-        Title = "BCom";
-        Width = 1050;
-        Height = 700;
-        MinWidth = 680;
-        MinHeight = 520;
+        Title = "BCom · Serial Monitor";
+        Width = 1120;
+        Height = 740;
+        MinWidth = 800;
+        MinHeight = 560;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        Background = new SolidColorBrush(Color.Parse("#F4F6FA"));
+        Background = BgWindow;
         Content = BuildLayout();
 
         _bauds.ItemsSource = BaudRates.Select(x => x.ToString()).ToArray();
@@ -77,8 +177,23 @@ public sealed class MainWindow : Window
         _dataBits.SelectedIndex = 0;
         _stopBits.SelectedIndex = 0;
         _parities.SelectedIndex = 0;
+
+        _ports.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _bauds.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _dataBits.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _stopBits.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _parities.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _ports.CornerRadius = new CornerRadius(7);
+        _bauds.CornerRadius = new CornerRadius(7);
+        _dataBits.CornerRadius = new CornerRadius(7);
+        _stopBits.CornerRadius = new CornerRadius(7);
+        _parities.CornerRadius = new CornerRadius(7);
+
         _languages.ItemsSource = new[] { "System / 系统", "English", "简体中文" };
         _languages.SelectedIndex = I18n.Preference switch { "en" => 1, "zh-CN" => 2, _ => 0 };
+        _languages.CornerRadius = new CornerRadius(7);
+        _languages.Height = 30;
+        _languages.Padding = new Thickness(8, 4);
         _languages.SelectionChanged += (_, _) =>
         {
             var preference = _languages.SelectedIndex switch { 1 => "en", 2 => "zh-CN", _ => "auto" };
@@ -110,14 +225,20 @@ public sealed class MainWindow : Window
         return control;
     }
 
-    private TextBlock Label(string key, double size = 13) =>
-        Translated(new TextBlock { FontSize = size, VerticalAlignment = VerticalAlignment.Center },
-            key, (c, text) => c.Text = text);
-
-    private Button ActionButton(string key, EventHandler<Avalonia.Interactivity.RoutedEventArgs> action)
+    private Button SecondaryButton(string key, EventHandler<Avalonia.Interactivity.RoutedEventArgs> action)
     {
-        var button = Translated(new Button { MinHeight = 35, Padding = new Thickness(13, 6) },
-            key, (c, text) => c.Content = text);
+        var button = Translated(new Button
+        {
+            Background = new SolidColorBrush(Color.Parse("#F8FAFC")),
+            Foreground = TextSecondary,
+            BorderBrush = BorderMuted,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(10, 4),
+            FontSize = 12,
+            FontWeight = FontWeight.Medium,
+            Cursor = new Cursor(StandardCursorType.Hand)
+        }, key, (c, text) => c.Content = text);
         button.Click += action;
         return button;
     }
@@ -129,26 +250,39 @@ public sealed class MainWindow : Window
         return menu;
     }
 
-    private Border Panel(Control child, Thickness? padding = null) =>
+    private TextBlock FormLabel(string key) =>
+        Translated(new TextBlock
+        {
+            FontSize = 11,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = TextMuted,
+            Margin = new Thickness(0, 8, 0, 3)
+        }, key, (c, text) => c.Text = text.ToUpperInvariant());
+
+    private Border Card(Control child, Thickness? padding = null) =>
         new()
         {
-            Background = Brushes.White,
-            CornerRadius = new CornerRadius(13),
-            Padding = padding ?? new Thickness(16),
+            Background = BgCard,
+            BorderBrush = BorderMuted,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(11),
+            Padding = padding ?? new Thickness(14),
             Child = child
         };
 
     private Control BuildLayout()
     {
-        var file = Translated(new MenuItem(), "File", (c, text) => c.Header = text);
-        file.ItemsSource = new[]
+        // 1. Top macOS-style App Navigation Bar
+        var fileMenu = Translated(new MenuItem(), "File", (c, text) => c.Header = text);
+        fileMenu.ItemsSource = new[]
         {
             Item("OpenFile", () => _ = OpenTextFile()),
             Item("SaveFile", () => _ = SaveReceived())
         };
-        var tools = Translated(new MenuItem(), "Tools", (c, text) => c.Header = text);
+
+        var toolsMenu = Translated(new MenuItem(), "Tools", (c, text) => c.Header = text);
         _modeMenu = Item("ModeCompact", ToggleCompact);
-        tools.ItemsSource = new[]
+        toolsMenu.ItemsSource = new[]
         {
             Item("Calculator", () => LaunchUtility("calculator")),
             Item("Notepad", () => LaunchUtility("editor")),
@@ -159,115 +293,429 @@ public sealed class MainWindow : Window
             Item("MindMap", () => _ = OpenUrl("https://www.freedraw.xyz/")),
             _modeMenu
         };
-        var help = Translated(new MenuItem(), "Help", (c, text) => c.Header = text);
-        help.ItemsSource = new[]
+
+        var helpMenu = Translated(new MenuItem(), "Help", (c, text) => c.Header = text);
+        helpMenu.ItemsSource = new[]
         {
             Item("Source", () => _ = OpenUrl("https://github.com/bestyize/BCom")),
             Item("WeChat", () => _ = ShowWeChat()),
             Item("About", () => _ = ShowMessage("AboutBody", null, "AboutTitle"))
         };
-        var menu = new Menu { ItemsSource = new[] { file, tools, help }, Background = Brushes.White };
-        DockPanel.SetDock(menu, Dock.Top);
 
-        var headerRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(2, 12, 2, 14) };
-        var brand = new StackPanel { Spacing = 4 };
-        brand.Children.Add(Translated(new TextBlock { FontSize = 23, FontWeight = FontWeight.Bold },
-            "Title", (c, text) => c.Text = text));
-        brand.Children.Add(Translated(new TextBlock { FontSize = 12, Foreground = Brushes.Gray },
-            "Subtitle", (c, text) => c.Text = text));
-        headerRow.Children.Add(brand);
-        var languageControls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center };
-        languageControls.Children.Add(Label("Language"));
-        _languages.MinWidth = 145;
-        languageControls.Children.Add(_languages);
-        Grid.SetColumn(languageControls, 1);
-        headerRow.Children.Add(languageControls);
+        var menuBar = new Menu
+        {
+            ItemsSource = new[] { fileMenu, toolsMenu, helpMenu },
+            Background = Brushes.Transparent,
+            VerticalAlignment = VerticalAlignment.Center
+        };
 
-        var left = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto,135,Auto"), RowSpacing = 10 };
-        var receiveHeader = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        receiveHeader.Children.Add(Label("Receive", 14));
-        var clearReceive = ActionButton("ClearReceive", (_, _) => { _received.Clear(); RenderReceived(); });
-        Grid.SetColumn(clearReceive, 1);
-        receiveHeader.Children.Add(clearReceive);
-        left.Children.Add(receiveHeader);
+        var topBarGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"),
+            Margin = new Thickness(0)
+        };
+
+        // Brand Icon + Title + Status Pill
+        var brandStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center };
+        var logoIcon = new Border
+        {
+            Width = 28,
+            Height = 28,
+            CornerRadius = new CornerRadius(7),
+            Background = AccentBlue,
+            Child = new TextBlock
+            {
+                Text = "BC",
+                FontSize = 12,
+                FontWeight = FontWeight.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        };
+        brandStack.Children.Add(logoIcon);
+
+        var titleText = Translated(new TextBlock
+        {
+            FontSize = 16,
+            FontWeight = FontWeight.Bold,
+            Foreground = TextPrimary,
+            VerticalAlignment = VerticalAlignment.Center
+        }, "Title", (c, text) => c.Text = text);
+        brandStack.Children.Add(titleText);
+
+        var statusPill = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#F1F5F9")),
+            BorderBrush = BorderMuted,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(9, 3),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { _statusDot, _statusPillText }
+            }
+        };
+        brandStack.Children.Add(statusPill);
+        topBarGrid.Children.Add(brandStack);
+
+        // Right side: Menu Bar + Language Selector
+        var topControls = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        topControls.Children.Add(menuBar);
+        topControls.Children.Add(_languages);
+        Grid.SetColumn(topControls, 2);
+        topBarGrid.Children.Add(topControls);
+
+        var topBarCard = new Border
+        {
+            Background = BgCard,
+            BorderBrush = BorderMuted,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(18, 9, 18, 9),
+            Child = topBarGrid
+        };
+        DockPanel.SetDock(topBarCard, Dock.Top);
+
+        // 2. Left Column: Receive Card & Send Card
+        var leftGrid = new Grid
+        {
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12
+        };
+
+        // --- Receive Card ---
+        var receiveGrid = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,*"),
+            RowSpacing = 9
+        };
+
+        var receiveHeaderGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var receiveTitle = Translated(new TextBlock
+        {
+            FontSize = 13.5,
+            FontWeight = FontWeight.Bold,
+            Foreground = TextPrimary,
+            VerticalAlignment = VerticalAlignment.Center
+        }, "Receive", (c, text) => c.Text = text);
+        receiveHeaderGrid.Children.Add(receiveTitle);
+
+        var rxBadge = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#F0FDF4")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#DCFCE7")),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(7, 2),
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = _rxCountBadge
+        };
+        Grid.SetColumn(rxBadge, 1);
+        receiveHeaderGrid.Children.Add(rxBadge);
+
+        var receiveActions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        receiveActions.Children.Add(Translated(_showHex, "HexDisplay", (c, text) => c.Content = text));
+        var clearReceive = SecondaryButton("ClearReceive", (_, _) => { _received.Clear(); RenderReceived(); });
+        var exportReceive = SecondaryButton("Export", (_, _) => _ = SaveReceived());
+        receiveActions.Children.Add(clearReceive);
+        receiveActions.Children.Add(exportReceive);
+        Grid.SetColumn(receiveActions, 3);
+        receiveHeaderGrid.Children.Add(receiveActions);
+        receiveGrid.Children.Add(receiveHeaderGrid);
 
         _output.PlaceholderText = I18n.T("ReceivePlaceholder");
         Grid.SetRow(_output, 1);
-        left.Children.Add(_output);
-        var receiveFlags = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-        receiveFlags.Children.Add(Translated(_showHex, "HexDisplay", (c, text) => c.Content = text));
-        Grid.SetRow(receiveFlags, 2);
-        left.Children.Add(receiveFlags);
-        var sendTitle = Label("SendPanel", 14);
-        Grid.SetRow(sendTitle, 3);
-        left.Children.Add(sendTitle);
+        receiveGrid.Children.Add(_output);
+        leftGrid.Children.Add(Card(receiveGrid));
+
+        // --- Send Card ---
+        var sendGrid = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
+            RowSpacing = 8
+        };
+
+        var sendHeaderGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var sendTitle = Translated(new TextBlock
+        {
+            FontSize = 13.5,
+            FontWeight = FontWeight.Bold,
+            Foreground = TextPrimary,
+            VerticalAlignment = VerticalAlignment.Center
+        }, "SendPanel", (c, text) => c.Text = text);
+        sendHeaderGrid.Children.Add(sendTitle);
+
+        var txBadge = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#EFF6FF")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#DBEAFE")),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(7, 2),
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = _txCountBadge
+        };
+        Grid.SetColumn(txBadge, 1);
+        sendHeaderGrid.Children.Add(txBadge);
+
+        var sendHeaderActions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        sendHeaderActions.Children.Add(Translated(_sendHex, "HexSend", (c, text) => c.Content = text));
+        sendHeaderActions.Children.Add(Translated(_newline, "NewLine", (c, text) => c.Content = text));
+        var importFile = SecondaryButton("Import", (_, _) => _ = OpenTextFile());
+        var clearSend = SecondaryButton("ClearSend", (_, _) => _input.Text = "");
+        sendHeaderActions.Children.Add(importFile);
+        sendHeaderActions.Children.Add(clearSend);
+        Grid.SetColumn(sendHeaderActions, 3);
+        sendHeaderGrid.Children.Add(sendHeaderActions);
+        sendGrid.Children.Add(sendHeaderGrid);
+
         _input.PlaceholderText = I18n.T("SendPlaceholder");
-        Grid.SetRow(_input, 4);
-        left.Children.Add(_input);
-        var sendActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 9 };
-        sendActions.Children.Add(ActionButton("Send", (_, _) => SendData()));
-        sendActions.Children.Add(ActionButton("ClearSend", (_, _) => _input.Text = ""));
-        sendActions.Children.Add(Translated(_sendHex, "HexSend", (c, text) => c.Content = text));
-        sendActions.Children.Add(Translated(_newline, "NewLine", (c, text) => c.Content = text));
-        Grid.SetRow(sendActions, 5);
-        left.Children.Add(sendActions);
+        Grid.SetRow(_input, 1);
+        sendGrid.Children.Add(_input);
 
-        var right = new StackPanel { Spacing = 10 };
-        right.Children.Add(Label("SerialSettings", 14));
-        right.Children.Add(Label("Port"));
-        var portRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 7 };
-        _ports.MinWidth = 120;
-        portRow.Children.Add(_ports);
-        var refresh = ActionButton("Refresh", (_, _) => RefreshPorts());
-        Grid.SetColumn(refresh, 1);
-        portRow.Children.Add(refresh);
-        right.Children.Add(portRow);
-        right.Children.Add(Label("Baud"));
-        right.Children.Add(_bauds);
-        right.Children.Add(Label("DataBits"));
-        right.Children.Add(_dataBits);
-        right.Children.Add(Label("StopBits"));
-        right.Children.Add(_stopBits);
-        right.Children.Add(Label("Parity"));
-        right.Children.Add(_parities);
-        _openButton.MinHeight = 39;
+        // Send Bottom Action Bar
+        var sendActionBar = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 4, 0, 0)
+        };
+
+        var shortcutHint = new TextBlock
+        {
+            Text = "HEX: 0A FF 12 · ASCII / UTF-8",
+            FontSize = 11,
+            Foreground = TextMuted,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        sendActionBar.Children.Add(shortcutHint);
+
+        var sendButton = Translated(new Button
+        {
+            Background = AccentBlue,
+            Foreground = Brushes.White,
+            FontWeight = FontWeight.Bold,
+            FontSize = 13.5,
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(28, 8),
+            MinHeight = 36,
+            Cursor = new Cursor(StandardCursorType.Hand)
+        }, "Send", (c, text) => c.Content = text);
+        sendButton.Click += (_, _) => SendData();
+        Grid.SetColumn(sendButton, 1);
+        sendActionBar.Children.Add(sendButton);
+
+        Grid.SetRow(sendActionBar, 2);
+        sendGrid.Children.Add(sendActionBar);
+
+        Grid.SetRow(Card(sendGrid), 1);
+        leftGrid.Children.Add(Card(sendGrid));
+
+        // 3. Right Column: Inspector Side Panel (Serial Settings)
+        var settingsStack = new StackPanel { Spacing = 4 };
+
+        var settingsHeader = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+        var settingsTitle = Translated(new TextBlock
+        {
+            FontSize = 13.5,
+            FontWeight = FontWeight.Bold,
+            Foreground = TextPrimary,
+            VerticalAlignment = VerticalAlignment.Center
+        }, "SerialSettings", (c, text) => c.Text = text);
+        settingsHeader.Children.Add(settingsTitle);
+
+        var refreshBtn = SecondaryButton("Refresh", (_, _) => RefreshPorts());
+        Grid.SetColumn(refreshBtn, 1);
+        settingsHeader.Children.Add(refreshBtn);
+        settingsStack.Children.Add(settingsHeader);
+
+        // Port selector
+        settingsStack.Children.Add(FormLabel("Port"));
+        settingsStack.Children.Add(_ports);
+
+        // Baud Rate
+        settingsStack.Children.Add(FormLabel("Baud"));
+        settingsStack.Children.Add(_bauds);
+
+        // Data Bits & Stop Bits in 2 columns
+        var bitsGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,8,*"),
+            Margin = new Thickness(0, 0, 0, 2)
+        };
+        var dataStack = new StackPanel { Children = { FormLabel("DataBits"), _dataBits } };
+        var stopStack = new StackPanel { Children = { FormLabel("StopBits"), _stopBits } };
+        Grid.SetColumn(stopStack, 2);
+        bitsGrid.Children.Add(dataStack);
+        bitsGrid.Children.Add(stopStack);
+        settingsStack.Children.Add(bitsGrid);
+
+        // Parity
+        settingsStack.Children.Add(FormLabel("Parity"));
+        settingsStack.Children.Add(_parities);
+
+        // Open/Close Connection Button
         _openButton.Click += (_, _) => TogglePort();
-        right.Children.Add(_openButton);
-        var signals = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14 };
-        signals.Children.Add(Translated(_rts, "Rts", (c, text) => c.Content = text));
-        signals.Children.Add(Translated(_dtr, "Dtr", (c, text) => c.Content = text));
-        right.Children.Add(signals);
-        right.Children.Add(Translated(_periodic, "Periodic", (c, text) => c.Content = text));
-        right.Children.Add(_interval);
+        _openButton.Margin = new Thickness(0, 12, 0, 8);
+        settingsStack.Children.Add(_openButton);
 
-        var main = new Grid { ColumnDefinitions = new ColumnDefinitions("2.5*,1*"), ColumnSpacing = 12 };
-        main.Children.Add(Panel(left));
-        _settingsPane.Child = right;
-        _settingsPane.Background = Brushes.White;
-        _settingsPane.CornerRadius = new CornerRadius(13);
+        // Flow control signals card
+        var signalsCard = new Border
+        {
+            Background = BgSubtle,
+            BorderBrush = BorderMuted,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 6),
+            Margin = new Thickness(0, 4, 0, 4),
+            Child = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    Translated(new TextBlock { FontSize = 10.5, FontWeight = FontWeight.SemiBold, Foreground = TextMuted },
+                        "Signals", (c, text) => c.Text = text.ToUpperInvariant()),
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        Spacing = 16,
+                        Children =
+                        {
+                            Translated(_rts, "Rts", (c, text) => c.Content = text),
+                            Translated(_dtr, "Dtr", (c, text) => c.Content = text)
+                        }
+                    }
+                }
+            }
+        };
+        settingsStack.Children.Add(signalsCard);
+
+        // Periodic auto-send card
+        var periodicCard = new Border
+        {
+            Background = BgSubtle,
+            BorderBrush = BorderMuted,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 8),
+            Margin = new Thickness(0, 4, 0, 4),
+            Child = new StackPanel
+            {
+                Spacing = 6,
+                Children =
+                {
+                    Translated(_periodic, "AutoRepeat", (c, text) => c.Content = text),
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        Spacing = 6,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Children =
+                        {
+                            _interval,
+                            Translated(new TextBlock { FontSize = 12, Foreground = TextSecondary, VerticalAlignment = VerticalAlignment.Center },
+                                "BytesUnit", (c, text) => c.Text = "ms")
+                        }
+                    }
+                }
+            }
+        };
+        settingsStack.Children.Add(periodicCard);
+
+        _settingsPane.Child = settingsStack;
+        _settingsPane.Background = BgCard;
+        _settingsPane.BorderBrush = BorderMuted;
+        _settingsPane.BorderThickness = new Thickness(1);
+        _settingsPane.CornerRadius = new CornerRadius(11);
         _settingsPane.Padding = new Thickness(16);
+        _settingsPane.Width = 270;
+
+        // Main Center Grid
+        var mainGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            ColumnSpacing = 14,
+            Margin = new Thickness(14, 12, 14, 12)
+        };
+        mainGrid.Children.Add(leftGrid);
         Grid.SetColumn(_settingsPane, 1);
-        main.Children.Add(_settingsPane);
+        mainGrid.Children.Add(_settingsPane);
 
-        var statusRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(4, 12, 4, 2) };
-        _status.Foreground = Brushes.DimGray;
-        _status.FontSize = 12;
-        statusRow.Children.Add(_status);
-        _counts.Foreground = Brushes.DimGray;
-        _counts.FontSize = 12;
-        Grid.SetColumn(_counts, 1);
-        statusRow.Children.Add(_counts);
+        // 4. Bottom Status Bar (macOS Status Strip)
+        var bottomStatusGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
 
-        var contentGrid = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto"), Margin = new Thickness(16) };
-        contentGrid.Children.Add(headerRow);
-        Grid.SetRow(main, 1);
-        contentGrid.Children.Add(main);
-        Grid.SetRow(statusRow, 2);
-        contentGrid.Children.Add(statusRow);
+        var statusLeft = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        statusLeft.Children.Add(_status);
+        bottomStatusGrid.Children.Add(statusLeft);
+
+        var statusRight = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        statusRight.Children.Add(_counts);
+        Grid.SetColumn(statusRight, 1);
+        bottomStatusGrid.Children.Add(statusRight);
+
+        var bottomBar = new Border
+        {
+            Background = BgCard,
+            BorderBrush = BorderMuted,
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(16, 6, 16, 6),
+            Child = bottomStatusGrid
+        };
+        DockPanel.SetDock(bottomBar, Dock.Bottom);
 
         var root = new DockPanel();
-        root.Children.Add(menu);
-        root.Children.Add(contentGrid);
+        root.Children.Add(topBarCard);
+        root.Children.Add(bottomBar);
+        root.Children.Add(mainGrid);
         return root;
     }
 
@@ -276,10 +724,20 @@ public sealed class MainWindow : Window
         foreach (var update in _translate) update();
         _output.PlaceholderText = I18n.T("ReceivePlaceholder");
         _input.PlaceholderText = I18n.T("SendPlaceholder");
-        _openButton.Content = I18n.T(_port?.IsOpen == true ? "ClosePort" : "OpenPort");
+        UpdateConnectionUI();
         _status.Text = I18n.Format(_statusKey, _statusArguments);
         if (_modeMenu != null)
             _modeMenu.Header = I18n.T(_compact ? "ModeAdvanced" : "ModeCompact");
+    }
+
+    private void UpdateConnectionUI()
+    {
+        bool isOpen = _port?.IsOpen == true;
+        _openButton.Content = I18n.T(isOpen ? "ClosePort" : "OpenPort");
+        _openButton.Background = isOpen ? AccentRed : AccentBlue;
+        _statusDot.Background = isOpen ? AccentGreen : StatusGray;
+        _statusPillText.Text = I18n.T(isOpen ? "ConnectedState" : "DisconnectedState");
+        _statusPillText.Foreground = isOpen ? AccentGreen : TextSecondary;
     }
 
     private void SetStatus(string key, params object[] args)
@@ -288,7 +746,13 @@ public sealed class MainWindow : Window
         _statusArguments = args;
         _status.Text = I18n.Format(key, args);
     }
-    private void UpdateCounts() => _counts.Text = $"R: {_received.Count}   S: {_sent}";
+
+    private void UpdateCounts()
+    {
+        _rxCountBadge.Text = $"{I18n.T("RxLabel")}: {_received.Count} {I18n.T("BytesUnit")}";
+        _txCountBadge.Text = $"{I18n.T("TxLabel")}: {_sent} {I18n.T("BytesUnit")}";
+        _counts.Text = $"R: {_received.Count}   S: {_sent}";
+    }
 
     private void RefreshPorts()
     {
@@ -324,7 +788,7 @@ public sealed class MainWindow : Window
             port.DataReceived += ReceiveData;
             port.Open();
             _port = port;
-            _openButton.Content = I18n.T("ClosePort");
+            UpdateConnectionUI();
             SetStatus("StatusOpen", name);
         }
         catch (Exception ex)
@@ -346,7 +810,7 @@ public sealed class MainWindow : Window
             catch (Exception ex) { SetStatus("ErrorClose", ex.Message); }
             finally { port.Dispose(); }
         }
-        _openButton.Content = I18n.T("OpenPort");
+        UpdateConnectionUI();
         SetStatus("StatusClosed");
     }
 
@@ -445,7 +909,7 @@ public sealed class MainWindow : Window
     {
         _compact = !_compact;
         _settingsPane.IsVisible = !_compact;
-        Width = _compact ? 760 : 1050;
+        Width = _compact ? 820 : 1120;
         if (_modeMenu != null)
             _modeMenu.Header = I18n.T(_compact ? "ModeAdvanced" : "ModeCompact");
     }
@@ -540,7 +1004,6 @@ public sealed class MainWindow : Window
     private async Task ShowWeChat()
     {
         using var bitmap = new Bitmap(AssetLoader.Open(new Uri("avares://BCom/res/weixin.png")));
-        // A dedicated Bitmap is also held by the window while the dialog is visible.
         var image = new Image { Source = bitmap, Height = 340, Stretch = Stretch.Uniform };
         var window = new Window
         {
@@ -548,11 +1011,32 @@ public sealed class MainWindow : Window
             Width = 430,
             Height = 465,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Content = new StackPanel { Margin = new Thickness(20), Spacing = 15, Children =
+            Background = BgCard,
+            Content = new StackPanel
             {
-                new TextBlock { Text = I18n.T("QrSubtitle"), HorizontalAlignment = HorizontalAlignment.Center },
-                image
-            } }
+                Margin = new Thickness(24),
+                Spacing = 16,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = I18n.T("QrSubtitle"),
+                        FontSize = 13,
+                        FontWeight = FontWeight.Medium,
+                        Foreground = TextSecondary,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    },
+                    new Border
+                    {
+                        BorderBrush = BorderMuted,
+                        BorderThickness = new Thickness(1),
+                        CornerRadius = new CornerRadius(8),
+                        Padding = new Thickness(10),
+                        Background = Brushes.White,
+                        Child = image
+                    }
+                }
+            }
         };
         await window.ShowDialog(this);
     }
@@ -566,15 +1050,38 @@ public sealed class MainWindow : Window
             Width = 440,
             Height = 195,
             CanResize = false,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = BgCard
         };
-        var close = new Button { Content = I18n.T("Ok"), HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 75 };
-        close.Click += (_, _) => dialog.Close();
-        dialog.Content = new StackPanel { Margin = new Thickness(22), Spacing = 22, Children =
+        var close = new Button
         {
-            new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
-            close
-        } };
+            Content = I18n.T("Ok"),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            MinWidth = 85,
+            Background = AccentBlue,
+            Foreground = Brushes.White,
+            FontWeight = FontWeight.SemiBold,
+            CornerRadius = new CornerRadius(7),
+            Padding = new Thickness(16, 6),
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        close.Click += (_, _) => dialog.Close();
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(24),
+            Spacing = 20,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = message,
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 13,
+                    Foreground = TextPrimary
+                },
+                close
+            }
+        };
         await dialog.ShowDialog(this);
     }
 }
