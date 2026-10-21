@@ -43,7 +43,7 @@ namespace BlueSerial.Utils
             {
                 hexString = hexString.Substring(0, hexString.LastIndexOf(" "));
             }
-            //过滤掉非hex形式的字符
+            //filter not hex char
             for (int i=0;i<hexString.ToCharArray().Length;i++)
             {
                 char s = hexString[i];
