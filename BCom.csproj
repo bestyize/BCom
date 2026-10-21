@@ -1,26 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>BCom</RootNamespace>
     <AssemblyName>BCom</AssemblyName>
-    <ApplicationIcon>icon.ico</ApplicationIcon>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>disable</Nullable>
-    <Platforms>AnyCPU</Platforms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
     <PublishTrimmed>false</PublishTrimmed>
+    <ApplicationTitle>BCom</ApplicationTitle>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
     <PackageReference Include="System.IO.Ports" Version="10.0.13" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Update="MainForm.resx">
-      <DependentUpon>MainForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="WxForm.resx">
-      <DependentUpon>WxForm.cs</DependentUpon>
-    </EmbeddedResource>
+    <Compile Include="CrossPlatform/**/*.cs" />
+    <AvaloniaResource Include="res/weixin.png" />
   </ItemGroup>
 </Project>
