@@ -95,12 +95,12 @@ dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:P
 
 1. **推送版本 Tag（推荐）**：
    ```bash
-   git tag v3.0.0
-   git push origin v3.0.0
+   git tag v3.2.0
+   git push origin v3.2.0
    ```
 2. **在 GitHub Actions 页面手动触发**：
    - 进入 Actions -> 选择 **Build and release BCom** 工作流。
-   - 点击 **Run workflow**，勾选 `Publish as GitHub Release`，输入标签名称（如 `v3.0.0`）。
+   - 点击 **Run workflow**，勾选 `Publish as GitHub Release`，输入标签名称（如 `v3.2.0`）。
 
 流水线将自动校验构建产物、生成 SHA-256 校验和、编写包含安装说明的 Release 说明，并上传全部 4 个平台的完整安装包。若同时配置了 Apple 开发者密钥，macOS DMG 还将自动完成 Apple 官方公证。
 
@@ -115,8 +115,8 @@ dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:P
 Apple Developer ID 及公证要求付费开发者账号。请勿把证书或密码提交到仓库。只配置了一部分密钥时，正式 macOS 打包会报错，避免发布错误产物。
 
 ```bash
-git tag v3.0.0
-git push origin v3.0.0
+git tag v3.2.0
+git push origin v3.2.0
 ```
 
 参考 [Apple 开发者分发指南](https://developer.apple.com/macos/distribution) 与 [Avalonia macOS 打包说明](https://docs.avaloniaui.net/docs/deployment/macos)。

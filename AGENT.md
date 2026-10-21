@@ -7,7 +7,7 @@ This document guides AI agents (Claude Code, Cursor, Copilot, autonomous workflo
 ## 1. Project Overview
 
 - **Name**: BCom (Cross-Platform Serial Communication Assistant)
-- **Version**: 3.0.0
+- **Version**: 3.2.0
 - **Framework**: .NET 10 LTS + Avalonia UI 12
 - **Supported Platforms**: Windows (x64), macOS (Apple Silicon arm64 & Intel x86_64), Linux (x64)
 - **Execution Modes**:

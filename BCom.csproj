@@ -16,7 +16,7 @@
     <EventSourceSupport>false</EventSourceSupport>
     <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
     <UseAppHost>true</UseAppHost>
-    <Version>3.0.0</Version>
+    <Version>3.2.0</Version>
     <ApplicationTitle>BCom</ApplicationTitle>
     <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>

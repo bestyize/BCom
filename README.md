@@ -97,12 +97,12 @@ GitHub Actions builds packages for Windows, macOS Intel, macOS Apple Silicon, an
 
 1. **Via Git Tag (Recommended)**:
    ```bash
-   git tag v3.0.0
-   git push origin v3.0.0
+   git tag v3.2.0
+   git push origin v3.2.0
    ```
 2. **Via GitHub Actions Manual Dispatch**:
    - Go to the **Actions** tab -> select **Build and release BCom**.
-   - Click **Run workflow**, check `Publish as GitHub Release`, and enter the version tag (e.g. `v3.0.0`).
+   - Click **Run workflow**, check `Publish as GitHub Release`, and enter the version tag (e.g. `v3.2.0`).
 
 The pipeline validates package archives, generates SHA-256 checksums, and uploads complete installation assets for all 4 platforms to the release.
 
@@ -117,8 +117,8 @@ If you have an Apple Developer account, configure the following repository secre
 Developer ID signing and notarization require a paid Apple Developer Program membership. Never commit a certificate or password to this repository. If a release is tagged with a partially configured credential set, the macOS job fails rather than publishing an invalid package.
 
 ```bash
-git tag v3.0.0
-git push origin v3.0.0
+git tag v3.2.0
+git push origin v3.2.0
 ```
 
 See Apple's [Developer ID distribution guidance](https://developer.apple.com/macos/distribution) and [Avalonia macOS packaging instructions](https://docs.avaloniaui.net/docs/deployment/macos).
