@@ -1,0 +1,104 @@
+name: Build and package BCom
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Windows (.NET Framework 4.7.2)
+    runs-on: windows-2022
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          msbuild .\BCom.csproj /m /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /verbosity:minimal
+          if ($LASTEXITCODE -ne 0) {
+            throw "MSBuild failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Create portable Windows ZIP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $buildDir = Join-Path $env:GITHUB_WORKSPACE 'bin\Release'
+          $stageDir = Join-Path $env:RUNNER_TEMP 'BCom'
+          $distDir = Join-Path $env:GITHUB_WORKSPACE 'dist'
+
+          if (-not (Test-Path (Join-Path $buildDir 'BCom.exe'))) {
+            throw 'Missing expected build output: bin\Release\BCom.exe'
+          }
+
+          New-Item -ItemType Directory -Path $stageDir, $distDir -Force | Out-Null
+          Copy-Item -Path (Join-Path $buildDir '*') -Destination $stageDir -Recurse -Force
+          Get-ChildItem -Path $stageDir -Recurse -File -Filter '*.pdb' | Remove-Item -Force
+
+          $label = if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $env:GITHUB_REF_NAME
+          } else {
+            "build-$env:GITHUB_RUN_NUMBER"
+          }
+          $label = $label -replace '[^a-zA-Z0-9._-]', '-'
+          $archive = Join-Path $distDir "BCom-$label-windows.zip"
+          Compress-Archive -Path (Join-Path $stageDir '*') -DestinationPath $archive -Force
+          Write-Host "Created $archive"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bcom-windows
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download packaged ZIP
+        uses: actions/download-artifact@v4
+        with:
+          name: bcom-windows
+          path: dist
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          packages=(dist/*.zip)
+          if (( ${#packages[@]} == 0 )); then
+            echo "No package ZIP was produced" >&2
+            exit 1
+          fi
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${packages[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${packages[@]}" \
+              --title "$GITHUB_REF_NAME" --generate-notes
+          fi
