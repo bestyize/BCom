@@ -60,6 +60,10 @@ internal static class I18n
         ["RxLabel"] = "Rx",
         ["TxLabel"] = "Tx",
         ["BytesUnit"] = "B",
+        ["Theme"] = "Theme",
+        ["ThemeSystem"] = "System",
+        ["ThemeLight"] = "Light",
+        ["ThemeDark"] = "Dark",
         ["Rts"] = "RTS",
         ["Dtr"] = "DTR",
         ["StatusReady"] = "Ready",
@@ -141,6 +145,10 @@ internal static class I18n
         ["RxLabel"] = "接收",
         ["TxLabel"] = "发送",
         ["BytesUnit"] = "字节",
+        ["Theme"] = "主题",
+        ["ThemeSystem"] = "跟随系统",
+        ["ThemeLight"] = "日间浅色",
+        ["ThemeDark"] = "夜间深色",
         ["Rts"] = "RTS",
         ["Dtr"] = "DTR",
         ["StatusReady"] = "就绪",
@@ -174,6 +182,8 @@ internal static class I18n
     };
 
     public static string Preference { get; private set; } = LoadPreference();
+    public static string ThemePreference { get; private set; } = LoadThemePreference();
+
     public static bool IsChinese => Preference switch
     {
         "zh-CN" => true,
@@ -194,12 +204,24 @@ internal static class I18n
     {
         if (preference is not ("auto" or "en" or "zh-CN")) return;
         Preference = preference;
+        SaveSettings();
+    }
+
+    public static void ChangeTheme(string theme)
+    {
+        if (theme is not ("auto" or "light" or "dark")) return;
+        ThemePreference = theme;
+        SaveSettings();
+    }
+
+    private static void SaveSettings()
+    {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-            File.WriteAllText(SettingsPath, $"{{\"Language\":\"{preference}\"}}");
+            File.WriteAllText(SettingsPath, $"{{\"Language\":\"{Preference}\",\"Theme\":\"{ThemePreference}\"}}");
         }
-        catch (IOException) { /* Read-only settings location: keep the session selection. */ }
+        catch (IOException) { /* Read-only settings location: keep session selection. */ }
         catch (UnauthorizedAccessException) { }
     }
 
@@ -210,9 +232,28 @@ internal static class I18n
             if (File.Exists(SettingsPath))
             {
                 var text = File.ReadAllText(SettingsPath);
+                if (text.Contains("\"Language\":\"zh-CN\"", StringComparison.OrdinalIgnoreCase)) return "zh-CN";
+                if (text.Contains("\"Language\":\"en\"", StringComparison.OrdinalIgnoreCase)) return "en";
+                if (text.Contains("\"Language\":\"auto\"", StringComparison.OrdinalIgnoreCase)) return "auto";
                 if (text.Contains("\"zh-CN\"", StringComparison.OrdinalIgnoreCase)) return "zh-CN";
                 if (text.Contains("\"en\"", StringComparison.OrdinalIgnoreCase)) return "en";
-                if (text.Contains("\"auto\"", StringComparison.OrdinalIgnoreCase)) return "auto";
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        return "auto";
+    }
+
+    private static string LoadThemePreference()
+    {
+        try
+        {
+            if (File.Exists(SettingsPath))
+            {
+                var text = File.ReadAllText(SettingsPath);
+                if (text.Contains("\"Theme\":\"dark\"", StringComparison.OrdinalIgnoreCase)) return "dark";
+                if (text.Contains("\"Theme\":\"light\"", StringComparison.OrdinalIgnoreCase)) return "light";
+                if (text.Contains("\"Theme\":\"auto\"", StringComparison.OrdinalIgnoreCase)) return "auto";
             }
         }
         catch (IOException) { }

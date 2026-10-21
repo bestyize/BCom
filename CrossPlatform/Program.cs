@@ -20,7 +20,12 @@ public sealed class App : Application
     public override void Initialize()
     {
         Styles.Add(new FluentTheme());
-        RequestedThemeVariant = ThemeVariant.Light;
+        RequestedThemeVariant = I18n.ThemePreference switch
+        {
+            "dark" => ThemeVariant.Dark,
+            "light" => ThemeVariant.Light,
+            _ => ThemeVariant.Default
+        };
     }
 
     public override void OnFrameworkInitializationCompleted()
