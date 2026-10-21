@@ -51,6 +51,21 @@ jobs:
           fi
           find publish -type f -name '*.pdb' -delete
 
+      - name: Smoke test Linux GUI startup
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libx11-6 libice6 libsm6 libfontconfig1 >/dev/null
+          status=0
+          timeout 10s xvfb-run -a ./publish/BCom > startup.log 2>&1 || status=$?
+          cat startup.log
+          if [[ "$status" -ne 124 ]]; then
+            echo "Linux GUI unexpectedly exited (status $status)" >&2
+            exit 1
+          fi
+
       - name: Package portable Windows ZIP
         if: runner.os == 'Windows'
         shell: pwsh
