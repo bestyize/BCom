@@ -538,8 +538,9 @@ public sealed class MainWindow : Window
         Grid.SetRow(sendActionBar, 2);
         sendGrid.Children.Add(sendActionBar);
 
-        Grid.SetRow(Card(sendGrid), 1);
-        leftGrid.Children.Add(Card(sendGrid));
+        var sendCard = Card(sendGrid);
+        Grid.SetRow(sendCard, 1);
+        leftGrid.Children.Add(sendCard);
 
         // 3. Right Column: Inspector Side Panel (Serial Settings)
         var settingsStack = new StackPanel { Spacing = 4 };
