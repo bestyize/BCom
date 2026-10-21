@@ -192,19 +192,21 @@ jobs:
           tag="$GITHUB_REF_NAME"
           if [[ "$GITHUB_REF_TYPE" != "tag" && -n "${{ inputs.tag_name }}" ]]; then
             tag="${{ inputs.tag_name }}"
+          elif [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
+            tag="v$(dotnet msbuild BCom.csproj -getProperty:Version)"
           fi
 
-          win="dist/BCom-$tag-win-x64.zip"
-          linux="dist/BCom-$tag-linux-x64.tar.gz"
-          mac_arm="dist/BCom-$tag-osx-arm64.dmg"
-          mac_x64="dist/BCom-$tag-osx-x64.dmg"
+          win=(dist/*-win-x64.zip)
+          linux=(dist/*-linux-x64.tar.gz)
+          mac_arm=(dist/*-osx-arm64.dmg)
+          mac_x64=(dist/*-osx-x64.dmg)
 
-          test -s "$win"
-          test -s "$linux"
-          test -s "$mac_arm"
-          test -s "$mac_x64"
+          test -s "${win[0]}"
+          test -s "${linux[0]}"
+          test -s "${mac_arm[0]}"
+          test -s "${mac_x64[0]}"
 
-          packages=("$win" "$linux" "$mac_arm" "$mac_x64")
+          packages=("${win[0]}" "${linux[0]}" "${mac_arm[0]}" "${mac_x64[0]}")
           ( cd dist && for file in "${packages[@]}"; do sha256sum "${file##*/}"; done ) > dist/SHA256SUMS.txt
           printf '%s\n' "${packages[@]}" >> "$GITHUB_STEP_SUMMARY"
           echo "ASSET_COUNT=${#packages[@]}" >> "$GITHUB_ENV"
@@ -220,11 +222,17 @@ jobs:
           tag="$GITHUB_REF_NAME"
           if [[ "$GITHUB_REF_TYPE" != "tag" && -n "${{ inputs.tag_name }}" ]]; then
             tag="${{ inputs.tag_name }}"
+          elif [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
+            tag="v$(dotnet msbuild BCom.csproj -getProperty:Version)"
           fi
 
           BCOM_TAG="$tag" bash .github/scripts/generate-release-notes.sh
 
-          packages=(dist/BCom-"$tag"-*.zip dist/BCom-"$tag"-*.tar.gz dist/BCom-"$tag"-*.dmg dist/SHA256SUMS.txt)
+          win=(dist/*-win-x64.zip)
+          linux=(dist/*-linux-x64.tar.gz)
+          mac_arm=(dist/*-osx-arm64.dmg)
+          mac_x64=(dist/*-osx-x64.dmg)
+          packages=("${win[0]}" "${linux[0]}" "${mac_arm[0]}" "${mac_x64[0]}" "dist/SHA256SUMS.txt")
           extra_args=()
           if [[ "${{ inputs.draft }}" == "true" ]]; then extra_args+=(--draft); fi
           if [[ "${{ inputs.prerelease }}" == "true" ]]; then extra_args+=(--prerelease); fi

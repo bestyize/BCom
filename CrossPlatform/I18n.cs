@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace BCom.CrossPlatform;
 
@@ -199,7 +197,7 @@ internal static class I18n
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(new LanguageSettings(preference), LanguageJsonContext.Default.LanguageSettings));
+            File.WriteAllText(SettingsPath, $"{{\"Language\":\"{preference}\"}}");
         }
         catch (IOException) { /* Read-only settings location: keep the session selection. */ }
         catch (UnauthorizedAccessException) { }
@@ -209,20 +207,16 @@ internal static class I18n
     {
         try
         {
-            var saved = JsonSerializer.Deserialize(File.ReadAllText(SettingsPath), LanguageJsonContext.Default.LanguageSettings);
-            if (saved?.Language is "auto" or "en" or "zh-CN") return saved.Language;
+            if (File.Exists(SettingsPath))
+            {
+                var text = File.ReadAllText(SettingsPath);
+                if (text.Contains("\"zh-CN\"", StringComparison.OrdinalIgnoreCase)) return "zh-CN";
+                if (text.Contains("\"en\"", StringComparison.OrdinalIgnoreCase)) return "en";
+                if (text.Contains("\"auto\"", StringComparison.OrdinalIgnoreCase)) return "auto";
+            }
         }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
-        catch (JsonException) { }
         return "auto";
-    }
-
-    public sealed record LanguageSettings(string Language);
-
-    [JsonSourceGenerationOptions(WriteIndented = false)]
-    [JsonSerializable(typeof(LanguageSettings))]
-    internal sealed partial class LanguageJsonContext : JsonSerializerContext
-    {
     }
 }
