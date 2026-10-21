@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 
@@ -59,6 +60,21 @@ public sealed class MainWindow : Window
         RefreshLanguage();
         SetStatus("StatusReady");
         UpdateCounts();
+        LoadWindowIcon();
+    }
+
+    private void LoadWindowIcon()
+    {
+        try
+        {
+            var uri = new Uri("avares://BCom/res/icon.png");
+            if (AssetLoader.Exists(uri))
+            {
+                using var stream = AssetLoader.Open(uri);
+                Icon = new WindowIcon(stream);
+            }
+        }
+        catch (Exception) { /* Non-fatal icon load fallback */ }
     }
 
     private Control BuildLayout()

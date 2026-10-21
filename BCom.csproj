@@ -18,6 +18,7 @@
     <UseAppHost>true</UseAppHost>
     <Version>2.1.0</Version>
     <ApplicationTitle>BCom</ApplicationTitle>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
@@ -26,6 +27,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CrossPlatform/**/*.cs" />
+    <AvaloniaResource Include="res/icon.png" Condition="Exists('res/icon.png')" />
     <AvaloniaResource Include="res/weixin.png" Condition="Exists('res/weixin.png')" />
   </ItemGroup>
 </Project>

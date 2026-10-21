@@ -9,8 +9,11 @@ set -euo pipefail
 : "${RUNNER_TEMP:?must run on a macOS Actions runner}"
 
 app="package/BCom.app"
-mkdir -p "$app/Contents/MacOS" dist
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" dist
 cp -R publish/. "$app/Contents/MacOS/"
+if [[ -f res/BCom.icns ]]; then
+  cp res/BCom.icns "$app/Contents/Resources/BCom.icns"
+fi
 chmod +x "$app/Contents/MacOS/BCom"
 short_version="${BCOM_VERSION%%-*}"
 
@@ -20,6 +23,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key><string>BCom</string>
+  <key>CFBundleIconFile</key><string>BCom.icns</string>
+  <key>CFBundleIconName</key><string>BCom</string>
   <key>CFBundleIdentifier</key><string>io.github.bestyize.bcom</string>
   <key>CFBundleName</key><string>BCom</string>
   <key>CFBundleDisplayName</key><string>BCom</string>
