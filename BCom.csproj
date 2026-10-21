@@ -9,6 +9,8 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
     <PublishTrimmed>false</PublishTrimmed>
+    <UseAppHost>true</UseAppHost>
+    <Version>2.1.0</Version>
     <ApplicationTitle>BCom</ApplicationTitle>
   </PropertyGroup>
   <ItemGroup>
