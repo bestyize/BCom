@@ -260,7 +260,7 @@ public sealed class MainWindow : Window
             var url = kind == "source"
                 ? "https://github.com/bestyize/BCom"
                 : "https://www.freedraw.xyz/";
-            _ = SystemLauncher.OpenUrlAsync(StorageProvider, url);
+            _ = SystemLauncher.OpenUrlAsync(Launcher, url);
             return;
         }
 

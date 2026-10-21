@@ -11,11 +11,12 @@ namespace BCom.CrossPlatform;
 /// </summary>
 public static class SystemLauncher
 {
-    public static async Task OpenUrlAsync(IStorageProvider? storageProvider, string url)
+    public static async Task OpenUrlAsync(ILauncher? launcher, string url)
     {
+        if (launcher == null) return;
         try
         {
-            await Avalonia.Input.Platform.Launcher.LaunchUriAsync(new Uri(url));
+            await launcher.LaunchUriAsync(new Uri(url));
         }
         catch (Exception)
         {
