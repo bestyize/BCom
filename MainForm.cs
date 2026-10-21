@@ -387,36 +387,46 @@ namespace BlueSerial
             wxForm.Show();
         }
 
+        // Shell execution restores URL and system utility launching on modern .NET.
+        private static void OpenExternalTool(string target)
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = target,
+                UseShellExecute = true
+            });
+        }
+
         private void Ts_menu_git_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("https://github.com/bestyize/BCom");
+            OpenExternalTool("https://github.com/bestyize/BCom");
         }
 
         private void Ts_menu_calc_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("calc");
+            OpenExternalTool("calc");
         }
 
         private void Ts_menu_nodepad_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("notepad");
+            OpenExternalTool("notepad");
         }
 
         private void Ts_menu_cmd_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("cmd");
+            OpenExternalTool("cmd");
         }
 
         private void Ts_menu_regedit_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("regedit");
+            OpenExternalTool("regedit");
         }
 
         private void Ts_menu_screenshot_Click(object sender, EventArgs e)
         {
             try
             {
-                System.Diagnostics.Process.Start("snippingtool");
+                OpenExternalTool("snippingtool");
             }
             catch (Exception)
             {
@@ -426,17 +436,17 @@ namespace BlueSerial
 
         private void Ts_menu_mspaint_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("mspaint");
+            OpenExternalTool("mspaint");
         }
 
         private void Ts_menu_screenshot_tool_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("snippingtool");
+            OpenExternalTool("snippingtool");
         }
 
         private void Ts_menu_mind_paint_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("http://www.freedraw.xyz/");
+            OpenExternalTool("http://www.freedraw.xyz/");
         }
 
         private void Ts_menu_mode_Click(object sender, EventArgs e)
@@ -458,7 +468,7 @@ namespace BlueSerial
 
         private void Ts_menu_notepad_tool_Click(object sender, EventArgs e)
         {
-            System.Diagnostics.Process.Start("notepad");
+            OpenExternalTool("notepad");
         }
 
         private void Ts_menu_save_as_Click(object sender, EventArgs e)
