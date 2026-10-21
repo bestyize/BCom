@@ -16,39 +16,40 @@ permissions:
 
 jobs:
   build:
-    name: Windows (.NET Framework 4.7.2)
+    name: Windows x64 (.NET 10)
     runs-on: windows-2022
 
     steps:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Set up MSBuild
-        uses: microsoft/setup-msbuild@v2
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
 
-      - name: Build Release
+      - name: Publish self-contained Windows x64 build
         shell: pwsh
         run: |
-          msbuild .\BCom.csproj /m /t:Rebuild /p:Configuration=Release /p:Platform=AnyCPU /verbosity:minimal
+          $ErrorActionPreference = 'Stop'
+          $publishDir = Join-Path $env:RUNNER_TEMP 'bcom-publish'
+          dotnet publish .\BCom.csproj -c Release -r win-x64 --self-contained true --output $publishDir -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false
           if ($LASTEXITCODE -ne 0) {
-            throw "MSBuild failed with exit code $LASTEXITCODE"
+            throw "dotnet publish failed with exit code $LASTEXITCODE"
+          }
+          if (-not (Test-Path (Join-Path $publishDir 'BCom.exe'))) {
+            throw 'Missing BCom.exe in publish directory'
           }
 
       - name: Create portable Windows ZIP
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $buildDir = Join-Path $env:GITHUB_WORKSPACE 'bin\Release'
-          $stageDir = Join-Path $env:RUNNER_TEMP 'BCom'
+          $publishDir = Join-Path $env:RUNNER_TEMP 'bcom-publish'
           $distDir = Join-Path $env:GITHUB_WORKSPACE 'dist'
 
-          if (-not (Test-Path (Join-Path $buildDir 'BCom.exe'))) {
-            throw 'Missing expected build output: bin\Release\BCom.exe'
-          }
-
-          New-Item -ItemType Directory -Path $stageDir, $distDir -Force | Out-Null
-          Copy-Item -Path (Join-Path $buildDir '*') -Destination $stageDir -Recurse -Force
-          Get-ChildItem -Path $stageDir -Recurse -File -Filter '*.pdb' | Remove-Item -Force
+          New-Item -ItemType Directory -Path $distDir -Force | Out-Null
+          Get-ChildItem -Path $publishDir -Recurse -File -Filter '*.pdb' | Remove-Item -Force
 
           $label = if ($env:GITHUB_REF_TYPE -eq 'tag') {
             $env:GITHUB_REF_NAME
@@ -56,14 +57,14 @@ jobs:
             "build-$env:GITHUB_RUN_NUMBER"
           }
           $label = $label -replace '[^a-zA-Z0-9._-]', '-'
-          $archive = Join-Path $distDir "BCom-$label-windows.zip"
-          Compress-Archive -Path (Join-Path $stageDir '*') -DestinationPath $archive -Force
+          $archive = Join-Path $distDir "BCom-$label-win-x64.zip"
+          Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $archive -Force
           Write-Host "Created $archive"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bcom-windows
+          name: bcom-win-x64
           path: dist/*.zip
           if-no-files-found: error
           retention-days: 30
@@ -80,7 +81,7 @@ jobs:
       - name: Download packaged ZIP
         uses: actions/download-artifact@v4
         with:
-          name: bcom-windows
+          name: bcom-win-x64
           path: dist
 
       - name: Create or update GitHub Release
