@@ -7,6 +7,27 @@ on:
   pull_request:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish as GitHub Release'
+        required: false
+        type: boolean
+        default: false
+      tag_name:
+        description: 'Release tag name (e.g. v2.1.0, required if publish_release is true)'
+        required: false
+        type: string
+        default: ''
+      draft:
+        description: 'Create release as draft'
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark release as pre-release'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -51,6 +72,13 @@ jobs:
               exit 1
             fi
             label="$GITHUB_REF_NAME"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.publish_release }}" == "true" && -n "${{ inputs.tag_name }}" ]]; then
+            label="${{ inputs.tag_name }}"
+            version="${label#v}"
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$$ ]]; then
+              echo "Invalid version tag: $label (expected vMAJOR.MINOR.PATCH)" >&2
+              exit 1
+            fi
           else
             version="$(dotnet msbuild BCom.csproj -getProperty:Version)"
             label="build-$GITHUB_RUN_NUMBER"
@@ -143,7 +171,7 @@ jobs:
 
   release:
     name: Publish verified GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release && inputs.tag_name != '')
     needs: build
     runs-on: ubuntu-24.04
     permissions:
@@ -162,18 +190,21 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           tag="$GITHUB_REF_NAME"
-          test -s "dist/BCom-$tag-win-x64.zip"
-          test -s "dist/BCom-$tag-linux-x64.tar.gz"
-          mac=(dist/BCom-"$tag"-osx-*.dmg)
-          if (( ${#mac[@]} != 0 && ${#mac[@]} != 2 )); then
-            echo "Expected both macOS architectures to be notarized, or neither" >&2
-            exit 1
+          if [[ "$GITHUB_REF_TYPE" != "tag" && -n "${{ inputs.tag_name }}" ]]; then
+            tag="${{ inputs.tag_name }}"
           fi
-          if (( ${#mac[@]} == 0 )); then
-            echo "::warning::macOS release packages omitted: Developer ID signing/notarization credentials are not configured."
-          fi
-          packages=("dist/BCom-$tag-win-x64.zip" "dist/BCom-$tag-linux-x64.tar.gz" "${mac[@]}")
-          for file in "${packages[@]}"; do test -s "$file"; done
+
+          win="dist/BCom-$tag-win-x64.zip"
+          linux="dist/BCom-$tag-linux-x64.tar.gz"
+          mac_arm="dist/BCom-$tag-osx-arm64.dmg"
+          mac_x64="dist/BCom-$tag-osx-x64.dmg"
+
+          test -s "$win"
+          test -s "$linux"
+          test -s "$mac_arm"
+          test -s "$mac_x64"
+
+          packages=("$win" "$linux" "$mac_arm" "$mac_x64")
           ( cd dist && for file in "${packages[@]}"; do sha256sum "${file##*/}"; done ) > dist/SHA256SUMS.txt
           printf '%s\n' "${packages[@]}" >> "$GITHUB_STEP_SUMMARY"
           echo "ASSET_COUNT=${#packages[@]}" >> "$GITHUB_ENV"
@@ -186,11 +217,56 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          packages=(dist/*-win-x64.zip dist/*-linux-x64.tar.gz dist/*-osx-*.dmg)
-          packages+=(dist/SHA256SUMS.txt)
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "${packages[@]}" --clobber
+          tag="$GITHUB_REF_NAME"
+          if [[ "$GITHUB_REF_TYPE" != "tag" && -n "${{ inputs.tag_name }}" ]]; then
+            tag="${{ inputs.tag_name }}"
+          fi
+
+          cat > dist/RELEASE_NOTES.md <<EOF
+## BCom ${tag}
+
+跨平台串口调试助手（.NET 10 LTS + Avalonia UI 12），支持 Windows、macOS 和 Linux。
+
+### 📦 安装包下载 / Downloads
+
+| 平台 / Platform | 下载文件 / Package | 说明 / Notes |
+| :--- | :--- | :--- |
+| **Windows (x64)** | \`BCom-${tag}-win-x64.zip\` | 解压后直接运行 \`BCom.exe\` |
+| **macOS (Apple Silicon M系列)** | \`BCom-${tag}-osx-arm64.dmg\` | 双击打开 DMG，将 \`BCom.app\` 拖入 Applications |
+| **macOS (Intel x64)** | \`BCom-${tag}-osx-x64.dmg\` | 双击打开 DMG，将 \`BCom.app\` 拖入 Applications |
+| **Linux (x64)** | \`BCom-${tag}-linux-x64.tar.gz\` | 解压后终端运行 \`./BCom\` |
+
+---
+
+### 🍎 macOS 首次运行提示“无法打开”或“已损坏”解决办法
+如果 macOS 提示应用已损坏或来自未识别的开发者（Gatekeeper 安全防护机制）：
+1. 打开 Mac 系统自带的 **终端 (Terminal)**；
+2. 复制并执行以下命令（清除下载隔离属性）：
+   \`\`\`bash
+   xattr -cr /Applications/BCom.app
+   \`\`\`
+3. 再次在“应用程序”中双击 \`BCom.app\` 即可正常启动。
+
+---
+
+### 校验和 / SHA-256 Checksums
+\`\`\`
+$(cat dist/SHA256SUMS.txt)
+\`\`\`
+EOF
+
+          packages=(dist/BCom-"$tag"-*.zip dist/BCom-"$tag"-*.tar.gz dist/BCom-"$tag"-*.dmg dist/SHA256SUMS.txt)
+          extra_args=()
+          if [[ "${{ inputs.draft }}" == "true" ]]; then extra_args+=(--draft); fi
+          if [[ "${{ inputs.prerelease }}" == "true" ]]; then extra_args+=(--prerelease); fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${packages[@]}" --clobber
+            gh release edit "$tag" --notes-file dist/RELEASE_NOTES.md "${extra_args[@]}"
           else
-            gh release create "$GITHUB_REF_NAME" "${packages[@]}" \
-              --title "BCom $GITHUB_REF_NAME" --generate-notes --verify-tag
+            gh release create "$tag" "${packages[@]}" \
+              --title "BCom $tag" \
+              --notes-file dist/RELEASE_NOTES.md \
+              --generate-notes \
+              "${extra_args[@]}"
           fi

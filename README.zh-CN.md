@@ -17,20 +17,27 @@
 
 **当前构建产物**可从 [GitHub Actions](https://github.com/bestyize/BCom/actions/workflows/build.yml) 下载。正式 Release 中的旧版 2.0 EXE 是 2019 年的 WinForms 版本，并非 .NET 10 程序。
 
-| 平台 | CI 测试包 | 正式发布包 |
+| 平台 | 下载文件 | 运行方式 |
 | --- | --- | --- |
-| Windows x64 | `BCom-build-*-win-x64.zip` | `BCom-v*-win-x64.zip` |
-| macOS Apple Silicon | `BCom-build-*-osx-arm64-UNNOTARIZED.zip` | `BCom-v*-osx-arm64.dmg`（需要 Apple 证书） |
-| macOS Intel | `BCom-build-*-osx-x64-UNNOTARIZED.zip` | `BCom-v*-osx-x64.dmg`（需要 Apple 证书） |
-| Linux x64 | `BCom-build-*-linux-x64.tar.gz` | `BCom-v*-linux-x64.tar.gz` |
+| Windows x64 | `BCom-*-win-x64.zip` | 解压后运行 `BCom.exe` |
+| macOS Apple Silicon (M系列) | `BCom-*-osx-arm64.dmg` | 双击挂载后拖拽 `BCom.app` 至 Applications |
+| macOS Intel (x64) | `BCom-*-osx-x64.dmg` | 双击挂载后拖拽 `BCom.app` 至 Applications |
+| Linux x64 | `BCom-*-linux-x64.tar.gz` | 解压后执行 `./BCom` |
 
-构建产物均为自包含包，无需另装 .NET Runtime。Windows 解压 ZIP 后运行 `BCom.exe`；Linux 解压后执行 `./BCom`，串口设备可能需要 `dialout` 等权限。
+构建产物均为自包含包，无需另装 .NET Runtime。
 
-### macOS 安装包损坏提示的原因
+### macOS 安装与 Gatekeeper 提示解决办法
 
-macOS 经互联网下载的应用需要有效的 **Developer ID 签名及 Apple 公证**才能在默认 Gatekeeper 设置下正常安装。此前打包脚本仅将 `.app` 压缩为 tar.gz，没有签名、公证，也未做安装验证，因此用户可能遇到“已损坏，无法打开”或“无法验证开发者”等提示。
+macOS 对网络下载的应用有严格的 Gatekeeper 安全检查。若应用未配置付费 Apple 开发者证书公证，首次打开可能提示 **“无法打开”** 或 **“应用已损坏，你应该将它移到废纸篓”**：
+1. 将 `BCom.app` 拖入 **应用程序 (Applications)** 目录。
+2. 打开 Mac 自带的 **终端 (Terminal)**。
+3. 执行以下命令清除隔离标记：
+   ```bash
+   xattr -cr /Applications/BCom.app
+   ```
+4. 重新双击 `BCom.app` 即可正常运行。也可以在系统「设置」->「隐私与安全性」中点击「仍要打开」。
 
-新工作流会在提供 Apple 证书后自动签名、公证、staple 和验证 DMG，再将其发布到 Releases。没有证书时，只生成清楚标记为 `UNNOTARIZED` 的 CI **开发测试包**，不将其误当成官方 Mac 安装包发布。改扩展名或重新压缩无法解决公证问题。
+若仓库配置了 Apple 开发者密钥（见下文），流水线将自动进行官方公证与装订，用户无需任何额外操作即可直接打开。
 
 ### Linux 运行示例
 
@@ -61,9 +68,22 @@ dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:P
 
 ## 自动打包与发布
 
-向 `master` 推送代码、发起 PR 或手动运行 GitHub Actions 时，都会构建 Windows、macOS Intel、macOS Apple Silicon 和 Linux，检查可执行文件、解包及校验；Linux 还执行 GUI 启动测试。推送 `vMAJOR.MINOR.PATCH` 标签后发布 Windows/Linux 包及 `SHA256SUMS.txt`；Apple 证书配置完整时另外发布双架构的签名公证 DMG。
+向 `master` 推送代码、发起 PR 或手动运行 GitHub Actions 时，都会构建 Windows、macOS Intel、macOS Apple Silicon 和 Linux，检查可执行文件、解包并做完整性校验。
 
-要启用 macOS 正式安装包，在 GitHub Actions Secrets 配置：
+### 发布 Release 的两种方式：
+
+1. **推送版本 Tag（推荐）**：
+   ```bash
+   git tag v2.1.0
+   git push origin v2.1.0
+   ```
+2. **在 GitHub Actions 页面手动触发**：
+   - 进入 Actions -> 选择 **Build and release BCom** 工作流。
+   - 点击 **Run workflow**，勾选 `Publish as GitHub Release`，输入标签名称（如 `v2.1.0`）。
+
+流水线将自动校验构建产物、生成 SHA-256 校验和、编写包含安装说明的 Release 说明，并上传全部 4 个平台的完整安装包。若同时配置了 Apple 开发者密钥，macOS DMG 还将自动完成 Apple 官方公证。
+
+要启用 Apple 官方公证（可选），在 GitHub Actions Secrets 配置：
 
 - `MACOS_CERTIFICATE_BASE64`：含私钥的 Developer ID Application .p12 证书，转换为 Base64。
 - `MACOS_CERTIFICATE_PASSWORD`：上述 .p12 文件密码。

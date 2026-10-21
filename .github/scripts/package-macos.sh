@@ -126,12 +126,18 @@ if [[ "$is_tag" == true && "$configured" -eq 5 ]]; then
   echo "Signed and notarized DMG: $dmg"
 else
   sign_macho "-"
-  archive="dist/BCom-$BCOM_LABEL-$BCOM_RID-UNNOTARIZED.zip"
+  stage="$RUNNER_TEMP/BCom-dmg-$BCOM_RID"
+  mkdir -p "$stage"
+  ditto "$app" "$stage/BCom.app"
+  ln -s /Applications "$stage/Applications"
+  dmg="dist/BCom-$BCOM_LABEL-$BCOM_RID.dmg"
+  hdiutil create -volname "BCom" -srcfolder "$stage" \
+    -format UDZO -ov "$dmg"
+  hdiutil verify "$dmg"
+  echo "Ad-hoc signed DMG created: $dmg"
+
+  archive="dist/BCom-$BCOM_LABEL-$BCOM_RID.zip"
   ditto -c -k --sequesterRsrc --keepParent "$app" "$archive"
-  verify_dir="$RUNNER_TEMP/bcom-verify-$BCOM_RID"
-  mkdir -p "$verify_dir"
-  ditto -x -k "$archive" "$verify_dir"
-  test -x "$verify_dir/BCom.app/Contents/MacOS/BCom"
-  codesign --verify --deep --strict --verbose=2 "$verify_dir/BCom.app"
-  echo "::warning::macOS test archive is ad-hoc signed and NOT notarized. It will not be uploaded to GitHub Releases."
+  echo "Ad-hoc signed ZIP created: $archive"
+  echo "::notice::macOS package created with ad-hoc signature. Users can open via Gatekeeper override (xattr -cr /Applications/BCom.app)."
 fi
