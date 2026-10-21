@@ -135,9 +135,5 @@ else
     -format UDZO -ov "$dmg"
   hdiutil verify "$dmg"
   echo "Ad-hoc signed DMG created: $dmg"
-
-  archive="dist/BCom-$BCOM_LABEL-$BCOM_RID.zip"
-  ditto -c -k --sequesterRsrc --keepParent "$app" "$archive"
-  echo "Ad-hoc signed ZIP created: $archive"
   echo "::notice::macOS package created with ad-hoc signature. Users can open via Gatekeeper override (xattr -cr /Applications/BCom.app)."
 fi

@@ -94,7 +94,7 @@ jobs:
             --self-contained true --output publish \
             -p:Version="${{ steps.metadata.outputs.version }}" \
             -p:UseAppHost=true -p:PublishSingleFile=true \
-            -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false
+            -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=true
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             test -s publish/BCom.exe
           else
