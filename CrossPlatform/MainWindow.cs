@@ -381,7 +381,7 @@ public sealed class MainWindow : Window
     {
         var bytes = _received.ToArray();
         _output.Text = _showHex.IsChecked == true
-            ? Convert.ToHexString(bytes).Chunk(2).Select(x => new string(x)).Aggregate("", (a, b) => a.Length == 0 ? b : a + " " + b)
+            ? BitConverter.ToString(bytes).Replace("-", " ")
             : Encoding.UTF8.GetString(bytes);
         UpdateCounts();
         _output.CaretIndex = _output.Text?.Length ?? 0;
