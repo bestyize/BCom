@@ -49,6 +49,8 @@ public sealed class MainWindow : Window
     private MenuItem? _modeMenu;
     private SerialPort? _port;
     private int _sent;
+    private string _statusKey = "StatusReady";
+    private object[] _statusArguments = Array.Empty<object>();
     private bool _compact;
 
     private static readonly int[] BaudRates = { 1382400, 460800, 230400, 115200, 38400, 9600 };
@@ -275,11 +277,17 @@ public sealed class MainWindow : Window
         _output.PlaceholderText = I18n.T("ReceivePlaceholder");
         _input.PlaceholderText = I18n.T("SendPlaceholder");
         _openButton.Content = I18n.T(_port?.IsOpen == true ? "ClosePort" : "OpenPort");
+        _status.Text = I18n.Format(_statusKey, _statusArguments);
         if (_modeMenu != null)
             _modeMenu.Header = I18n.T(_compact ? "ModeAdvanced" : "ModeCompact");
     }
 
-    private void SetStatus(string key, params object[] args) => _status.Text = I18n.Format(key, args);
+    private void SetStatus(string key, params object[] args)
+    {
+        _statusKey = key;
+        _statusArguments = args;
+        _status.Text = I18n.Format(key, args);
+    }
     private void UpdateCounts() => _counts.Text = $"R: {_received.Count}   S: {_sent}";
 
     private void RefreshPorts()
