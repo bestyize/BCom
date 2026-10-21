@@ -8,7 +8,7 @@ using Avalonia.Media;
 namespace BCom.CrossPlatform;
 
 /// <summary>
-/// Data monitoring and transmission view with monospace console formatting.
+/// Data monitoring and transmission view with monospace console formatting and dynamic day/night theme adaptation.
 /// </summary>
 public sealed class MonitorView
 {
@@ -19,11 +19,9 @@ public sealed class MonitorView
         TextWrapping = TextWrapping.Wrap,
         FontFamily = MacTheme.MonoFont,
         FontSize = 13,
-        Background = MacTheme.BgEditor,
-        BorderBrush = MacTheme.BorderMuted,
-        BorderThickness = new Thickness(1),
         CornerRadius = new CornerRadius(8),
-        Padding = new Thickness(10, 8)
+        Padding = new Thickness(10, 8),
+        BorderThickness = new Thickness(1)
     };
 
     private readonly TextBox _input = new()
@@ -32,34 +30,26 @@ public sealed class MonitorView
         TextWrapping = TextWrapping.Wrap,
         FontFamily = MacTheme.MonoFont,
         FontSize = 13,
-        Background = Brushes.White,
-        BorderBrush = MacTheme.BorderMuted,
-        BorderThickness = new Thickness(1),
         CornerRadius = new CornerRadius(8),
         Padding = new Thickness(10, 8),
-        MinHeight = 85
+        MinHeight = 85,
+        BorderThickness = new Thickness(1)
     };
 
     private readonly CheckBox _showHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _sendHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _newline = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
 
-    private readonly TextBlock _rxCountBadge = new()
-    {
-        FontSize = 11.5,
-        FontWeight = FontWeight.SemiBold,
-        Foreground = new SolidColorBrush(Color.Parse("#16A34A"))
-    };
+    private readonly TextBlock _rxCountBadge = new() { FontSize = 11.5, FontWeight = FontWeight.SemiBold };
+    private readonly TextBlock _txCountBadge = new() { FontSize = 11.5, FontWeight = FontWeight.SemiBold };
 
-    private readonly TextBlock _txCountBadge = new()
-    {
-        FontSize = 11.5,
-        FontWeight = FontWeight.SemiBold,
-        Foreground = new SolidColorBrush(Color.Parse("#0284C7"))
-    };
-
+    private Border? _receiveCardBorder;
+    private Border? _sendCardBorder;
+    private Border? _rxBadgeBorder;
+    private Border? _txBadgeBorder;
     private TextBlock? _receiveTitle;
     private TextBlock? _sendTitle;
+    private TextBlock? _shortcutHint;
     private Button? _sendButton;
     private Button? _clearReceiveBtn;
     private Button? _exportReceiveBtn;
@@ -99,6 +89,7 @@ public sealed class MonitorView
     {
         _showHex.IsCheckedChanged += (_, _) => HexDisplayToggled?.Invoke(IsShowHex);
         Control = BuildView();
+        ApplyTheme();
         RefreshLanguage();
     }
 
@@ -125,6 +116,60 @@ public sealed class MonitorView
         _input.PlaceholderText = I18n.T("SendPlaceholder");
     }
 
+    public void ApplyTheme()
+    {
+        if (_receiveCardBorder != null)
+        {
+            _receiveCardBorder.Background = MacTheme.BgCard;
+            _receiveCardBorder.BorderBrush = MacTheme.BorderMuted;
+        }
+
+        if (_sendCardBorder != null)
+        {
+            _sendCardBorder.Background = MacTheme.BgCard;
+            _sendCardBorder.BorderBrush = MacTheme.BorderMuted;
+        }
+
+        _output.Background = MacTheme.BgEditor;
+        _output.Foreground = MacTheme.TextPrimary;
+        _output.BorderBrush = MacTheme.BorderMuted;
+
+        _input.Background = MacTheme.IsDark ? new SolidColorBrush(Color.Parse("#1C1C20")) : Brushes.White;
+        _input.Foreground = MacTheme.TextPrimary;
+        _input.BorderBrush = MacTheme.BorderMuted;
+
+        if (_receiveTitle != null) _receiveTitle.Foreground = MacTheme.TextPrimary;
+        if (_sendTitle != null) _sendTitle.Foreground = MacTheme.TextPrimary;
+        if (_shortcutHint != null) _shortcutHint.Foreground = MacTheme.TextMuted;
+
+        if (_rxBadgeBorder != null)
+        {
+            _rxBadgeBorder.Background = MacTheme.RxBg;
+            _rxBadgeBorder.BorderBrush = MacTheme.RxBorder;
+            _rxCountBadge.Foreground = MacTheme.RxText;
+        }
+
+        if (_txBadgeBorder != null)
+        {
+            _txBadgeBorder.Background = MacTheme.TxBg;
+            _txBadgeBorder.BorderBrush = MacTheme.TxBorder;
+            _txCountBadge.Foreground = MacTheme.TxText;
+        }
+
+        UpdateSecondaryButton(_clearReceiveBtn);
+        UpdateSecondaryButton(_exportReceiveBtn);
+        UpdateSecondaryButton(_importSendBtn);
+        UpdateSecondaryButton(_clearSendBtn);
+    }
+
+    private static void UpdateSecondaryButton(Button? button)
+    {
+        if (button == null) return;
+        button.Background = MacTheme.BgSubtle;
+        button.Foreground = MacTheme.TextSecondary;
+        button.BorderBrush = MacTheme.BorderMuted;
+    }
+
     private Control BuildView()
     {
         var mainGrid = new Grid
@@ -133,7 +178,7 @@ public sealed class MonitorView
             RowSpacing = 12
         };
 
-        // --- 1. Receive Card ---
+        // 1. Receive Monitor Card
         var receiveGrid = new Grid
         {
             RowDefinitions = new RowDefinitions("Auto,*"),
@@ -156,10 +201,10 @@ public sealed class MonitorView
         };
         receiveHeaderGrid.Children.Add(_receiveTitle);
 
-        var rxBadge = MacTheme.CreateBadge(_rxCountBadge, "#F0FDF4", "#DCFCE7");
-        rxBadge.Margin = new Thickness(8, 0, 0, 0);
-        Grid.SetColumn(rxBadge, 1);
-        receiveHeaderGrid.Children.Add(rxBadge);
+        _rxBadgeBorder = MacTheme.CreateBadge(_rxCountBadge, MacTheme.RxBg, MacTheme.RxBorder);
+        _rxBadgeBorder.Margin = new Thickness(8, 0, 0, 0);
+        Grid.SetColumn(_rxBadgeBorder, 1);
+        receiveHeaderGrid.Children.Add(_rxBadgeBorder);
 
         var receiveActions = new StackPanel
         {
@@ -178,9 +223,11 @@ public sealed class MonitorView
 
         Grid.SetRow(_output, 1);
         receiveGrid.Children.Add(_output);
-        mainGrid.Children.Add(MacTheme.CreateCard(receiveGrid));
 
-        // --- 2. Send Card ---
+        _receiveCardBorder = MacTheme.CreateCard(receiveGrid);
+        mainGrid.Children.Add(_receiveCardBorder);
+
+        // 2. Send Control Card
         var sendGrid = new Grid
         {
             RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
@@ -203,10 +250,10 @@ public sealed class MonitorView
         };
         sendHeaderGrid.Children.Add(_sendTitle);
 
-        var txBadge = MacTheme.CreateBadge(_txCountBadge, "#EFF6FF", "#DBEAFE");
-        txBadge.Margin = new Thickness(8, 0, 0, 0);
-        Grid.SetColumn(txBadge, 1);
-        sendHeaderGrid.Children.Add(txBadge);
+        _txBadgeBorder = MacTheme.CreateBadge(_txCountBadge, MacTheme.TxBg, MacTheme.TxBorder);
+        _txBadgeBorder.Margin = new Thickness(8, 0, 0, 0);
+        Grid.SetColumn(_txBadgeBorder, 1);
+        sendHeaderGrid.Children.Add(_txBadgeBorder);
 
         var sendHeaderActions = new StackPanel
         {
@@ -234,14 +281,14 @@ public sealed class MonitorView
             Margin = new Thickness(0, 4, 0, 0)
         };
 
-        var shortcutHint = new TextBlock
+        _shortcutHint = new TextBlock
         {
             Text = "HEX: 0A FF 12 · ASCII / UTF-8",
             FontSize = 11,
             Foreground = MacTheme.TextMuted,
             VerticalAlignment = VerticalAlignment.Center
         };
-        sendActionBar.Children.Add(shortcutHint);
+        sendActionBar.Children.Add(_shortcutHint);
 
         _sendButton = new Button
         {
@@ -262,9 +309,9 @@ public sealed class MonitorView
         Grid.SetRow(sendActionBar, 2);
         sendGrid.Children.Add(sendActionBar);
 
-        var sendCard = MacTheme.CreateCard(sendGrid);
-        Grid.SetRow(sendCard, 1);
-        mainGrid.Children.Add(sendCard);
+        _sendCardBorder = MacTheme.CreateCard(sendGrid);
+        Grid.SetRow(_sendCardBorder, 1);
+        mainGrid.Children.Add(_sendCardBorder);
 
         return mainGrid;
     }

@@ -10,7 +10,7 @@ using Avalonia.Media;
 namespace BCom.CrossPlatform;
 
 /// <summary>
-/// Serial configuration inspector panel for selecting port, baud rates, and hardware signals.
+/// Serial configuration inspector panel for selecting port, baud rates, and hardware signals with day/night adaptation.
 /// </summary>
 public sealed class SettingsPanel
 {
@@ -46,13 +46,14 @@ public sealed class SettingsPanel
         Height = 28,
         FontFamily = MacTheme.MonoFont,
         FontSize = 12,
-        BorderBrush = MacTheme.BorderMuted,
         BorderThickness = new Thickness(1),
         CornerRadius = new CornerRadius(6),
         Padding = new Thickness(6, 3),
         VerticalAlignment = VerticalAlignment.Center
     };
 
+    private Border? _signalsCard;
+    private Border? _periodicCard;
     private TextBlock? _settingsTitle;
     private TextBlock? _portLabel;
     private TextBlock? _baudLabel;
@@ -60,6 +61,7 @@ public sealed class SettingsPanel
     private TextBlock? _stopLabel;
     private TextBlock? _parityLabel;
     private TextBlock? _signalsTitle;
+    private TextBlock? _msLabel;
     private Button? _refreshBtn;
     private bool _isOpen;
 
@@ -103,6 +105,7 @@ public sealed class SettingsPanel
         _interval.TextChanged += (_, _) => OnPeriodicChanged();
 
         Container = BuildView();
+        ApplyTheme();
         RefreshLanguage();
     }
 
@@ -155,6 +158,46 @@ public sealed class SettingsPanel
         _rts.Content = I18n.T("Rts");
         _dtr.Content = I18n.T("Dtr");
         _periodic.Content = I18n.T("AutoRepeat");
+    }
+
+    public void ApplyTheme()
+    {
+        Container.Background = MacTheme.BgCard;
+        Container.BorderBrush = MacTheme.BorderMuted;
+
+        if (_settingsTitle != null) _settingsTitle.Foreground = MacTheme.TextPrimary;
+        if (_portLabel != null) _portLabel.Foreground = MacTheme.TextMuted;
+        if (_baudLabel != null) _baudLabel.Foreground = MacTheme.TextMuted;
+        if (_dataLabel != null) _dataLabel.Foreground = MacTheme.TextMuted;
+        if (_stopLabel != null) _stopLabel.Foreground = MacTheme.TextMuted;
+        if (_parityLabel != null) _parityLabel.Foreground = MacTheme.TextMuted;
+        if (_signalsTitle != null) _signalsTitle.Foreground = MacTheme.TextMuted;
+        if (_msLabel != null) _msLabel.Foreground = MacTheme.TextSecondary;
+
+        if (_refreshBtn != null)
+        {
+            _refreshBtn.Background = MacTheme.BgSubtle;
+            _refreshBtn.Foreground = MacTheme.TextSecondary;
+            _refreshBtn.BorderBrush = MacTheme.BorderMuted;
+        }
+
+        if (_signalsCard != null)
+        {
+            _signalsCard.Background = MacTheme.BgSubtle;
+            _signalsCard.BorderBrush = MacTheme.BorderMuted;
+        }
+
+        if (_periodicCard != null)
+        {
+            _periodicCard.Background = MacTheme.BgSubtle;
+            _periodicCard.BorderBrush = MacTheme.BorderMuted;
+        }
+
+        _interval.Background = MacTheme.IsDark ? new SolidColorBrush(Color.Parse("#1C1C20")) : Brushes.White;
+        _interval.Foreground = MacTheme.TextPrimary;
+        _interval.BorderBrush = MacTheme.BorderMuted;
+
+        _openButton.Background = _isOpen ? MacTheme.AccentRed : MacTheme.AccentBlue;
     }
 
     private void OnSignalsChanged()
@@ -231,7 +274,7 @@ public sealed class SettingsPanel
             Foreground = MacTheme.TextMuted
         };
 
-        var signalsCard = new Border
+        _signalsCard = new Border
         {
             Background = MacTheme.BgSubtle,
             BorderBrush = MacTheme.BorderMuted,
@@ -254,9 +297,17 @@ public sealed class SettingsPanel
                 }
             }
         };
-        stack.Children.Add(signalsCard);
+        stack.Children.Add(_signalsCard);
 
-        var periodicCard = new Border
+        _msLabel = new TextBlock
+        {
+            Text = "ms",
+            FontSize = 12,
+            Foreground = MacTheme.TextSecondary,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        _periodicCard = new Border
         {
             Background = MacTheme.BgSubtle,
             BorderBrush = MacTheme.BorderMuted,
@@ -275,22 +326,12 @@ public sealed class SettingsPanel
                         Orientation = Orientation.Horizontal,
                         Spacing = 6,
                         VerticalAlignment = VerticalAlignment.Center,
-                        Children =
-                        {
-                            _interval,
-                            new TextBlock
-                            {
-                                Text = "ms",
-                                FontSize = 12,
-                                Foreground = MacTheme.TextSecondary,
-                                VerticalAlignment = VerticalAlignment.Center
-                            }
-                        }
+                        Children = { _interval, _msLabel }
                     }
                 }
             }
         };
-        stack.Children.Add(periodicCard);
+        stack.Children.Add(_periodicCard);
 
         return new Border
         {

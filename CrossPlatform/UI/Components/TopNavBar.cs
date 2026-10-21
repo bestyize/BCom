@@ -1,13 +1,14 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 
 namespace BCom.CrossPlatform;
 
 /// <summary>
-/// macOS-style top navigation and menu bar component.
+/// macOS-style top navigation bar component with theme and language selectors.
 /// </summary>
 public sealed class TopNavBar
 {
@@ -30,12 +31,16 @@ public sealed class TopNavBar
     };
 
     private readonly ComboBox _languages = new();
+    private readonly ComboBox _themes = new();
+    private Border? _barBorder;
+    private Border? _statusPill;
     private MenuItem? _fileMenu;
     private MenuItem? _toolsMenu;
     private MenuItem? _helpMenu;
     private MenuItem? _modeMenu;
     private TextBlock? _titleText;
     private bool _compact;
+    private bool _suppressThemeEvent;
 
     public event Action? OpenFileRequested;
     public event Action? SaveReceivedRequested;
@@ -44,6 +49,7 @@ public sealed class TopNavBar
     public event Action? ShowWeChatRequested;
     public event Action? ShowAboutRequested;
     public event Action<string>? LanguageChanged;
+    public event Action<string>? ThemeChanged;
 
     public Control Control { get; }
 
@@ -60,7 +66,20 @@ public sealed class TopNavBar
             LanguageChanged?.Invoke(preference);
         };
 
+        _themes.ItemsSource = new[] { I18n.T("ThemeSystem"), I18n.T("ThemeLight"), I18n.T("ThemeDark") };
+        _themes.SelectedIndex = I18n.ThemePreference switch { "light" => 1, "dark" => 2, _ => 0 };
+        _themes.CornerRadius = new CornerRadius(7);
+        _themes.Height = 30;
+        _themes.Padding = new Thickness(8, 4);
+        _themes.SelectionChanged += (_, _) =>
+        {
+            if (_suppressThemeEvent) return;
+            var theme = _themes.SelectedIndex switch { 1 => "light", 2 => "dark", _ => "auto" };
+            ThemeChanged?.Invoke(theme);
+        };
+
         Control = BuildView();
+        ApplyTheme();
         RefreshLanguage();
     }
 
@@ -89,6 +108,33 @@ public sealed class TopNavBar
         if (_toolsMenu != null) _toolsMenu.Header = I18n.T("Tools");
         if (_helpMenu != null) _helpMenu.Header = I18n.T("Help");
         if (_modeMenu != null) _modeMenu.Header = I18n.T(_compact ? "ModeAdvanced" : "ModeCompact");
+
+        _suppressThemeEvent = true;
+        _themes.ItemsSource = new[] { I18n.T("ThemeSystem"), I18n.T("ThemeLight"), I18n.T("ThemeDark") };
+        _themes.SelectedIndex = I18n.ThemePreference switch { "light" => 1, "dark" => 2, _ => 0 };
+        _suppressThemeEvent = false;
+    }
+
+    public void ApplyTheme()
+    {
+        if (_barBorder != null)
+        {
+            _barBorder.Background = MacTheme.BgCard;
+            _barBorder.BorderBrush = MacTheme.BorderMuted;
+        }
+
+        if (_statusPill != null)
+        {
+            _statusPill.Background = MacTheme.BgSubtle;
+            _statusPill.BorderBrush = MacTheme.BorderMuted;
+        }
+
+        if (_titleText != null)
+        {
+            _titleText.Foreground = MacTheme.TextPrimary;
+        }
+
+        _statusPillText.Foreground = MacTheme.TextSecondary;
     }
 
     private Control BuildView()
@@ -169,9 +215,9 @@ public sealed class TopNavBar
         };
         brandStack.Children.Add(_titleText);
 
-        var statusPill = new Border
+        _statusPill = new Border
         {
-            Background = new SolidColorBrush(Color.Parse("#F1F5F9")),
+            Background = MacTheme.BgSubtle,
             BorderBrush = MacTheme.BorderMuted,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12),
@@ -184,21 +230,22 @@ public sealed class TopNavBar
                 Children = { _statusDot, _statusPillText }
             }
         };
-        brandStack.Children.Add(statusPill);
+        brandStack.Children.Add(_statusPill);
         topBarGrid.Children.Add(brandStack);
 
         var topControls = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 12,
+            Spacing = 10,
             VerticalAlignment = VerticalAlignment.Center
         };
         topControls.Children.Add(menuBar);
+        topControls.Children.Add(_themes);
         topControls.Children.Add(_languages);
         Grid.SetColumn(topControls, 2);
         topBarGrid.Children.Add(topControls);
 
-        return new Border
+        _barBorder = new Border
         {
             Background = MacTheme.BgCard,
             BorderBrush = MacTheme.BorderMuted,
@@ -206,6 +253,7 @@ public sealed class TopNavBar
             Padding = new Thickness(18, 9, 18, 9),
             Child = topBarGrid
         };
+        return _barBorder;
     }
 
     private static MenuItem CreateToolItem(string key, Action action)

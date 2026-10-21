@@ -6,11 +6,13 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 
 namespace BCom.CrossPlatform;
 
 /// <summary>
 /// Main application window coordinator, orchestrating decoupled UI components and serial services.
+/// Supports dynamic day/night theme adaptation.
 /// </summary>
 public sealed class MainWindow : Window
 {
@@ -27,6 +29,7 @@ public sealed class MainWindow : Window
         VerticalAlignment = VerticalAlignment.Center
     };
 
+    private Border? _bottomBar;
     private int _sentBytes;
     private string _statusKey = "StatusReady";
     private object[] _statusArguments = Array.Empty<object>();
@@ -40,7 +43,6 @@ public sealed class MainWindow : Window
         MinWidth = 800;
         MinHeight = 560;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        Background = MacTheme.BgWindow;
 
         Content = BuildLayout();
         WireEvents();
@@ -48,6 +50,12 @@ public sealed class MainWindow : Window
         Opened += (_, _) => _serial.StartPortScanning();
         Closed += (_, _) => _serial.Dispose();
 
+        if (Application.Current != null)
+        {
+            Application.Current.ActualThemeVariantChanged += (_, _) => ApplyTheme();
+        }
+
+        ApplyTheme();
         RefreshLanguage();
         SetStatus("StatusReady");
         UpdateCounts();
@@ -65,7 +73,7 @@ public sealed class MainWindow : Window
         Grid.SetColumn(_settings.Container, 1);
         mainGrid.Children.Add(_settings.Container);
 
-        var bottomBar = new Border
+        _bottomBar = new Border
         {
             Background = MacTheme.BgCard,
             BorderBrush = MacTheme.BorderMuted,
@@ -78,11 +86,11 @@ public sealed class MainWindow : Window
                 Children = { _statusText }
             }
         };
-        DockPanel.SetDock(bottomBar, Dock.Bottom);
+        DockPanel.SetDock(_bottomBar, Dock.Bottom);
 
         var root = new DockPanel();
         root.Children.Add(_topNav.Control);
-        root.Children.Add(bottomBar);
+        root.Children.Add(_bottomBar);
         root.Children.Add(mainGrid);
         return root;
     }
@@ -97,6 +105,7 @@ public sealed class MainWindow : Window
         _topNav.ShowWeChatRequested += () => _ = MacDialog.ShowWeChatQrAsync(this);
         _topNav.ShowAboutRequested += () => _ = MacDialog.ShowAlertAsync(this, I18n.T("AboutBody"), I18n.T("AboutTitle"));
         _topNav.LanguageChanged += OnLanguageChanged;
+        _topNav.ThemeChanged += OnThemeChanged;
 
         // Monitor View Events
         _monitor.SendRequested += HandleSendData;
@@ -117,6 +126,38 @@ public sealed class MainWindow : Window
         _serial.ConnectionChanged += HandleConnectionChanged;
         _serial.ErrorOccurred += msg => SetStatusRaw(msg);
         _serial.PortsScanned += ports => _settings.SetAvailablePorts(ports);
+    }
+
+    private void ApplyTheme()
+    {
+        Background = MacTheme.BgWindow;
+
+        if (_bottomBar != null)
+        {
+            _bottomBar.Background = MacTheme.BgCard;
+            _bottomBar.BorderBrush = MacTheme.BorderMuted;
+        }
+
+        _statusText.Foreground = MacTheme.TextSecondary;
+
+        _topNav.ApplyTheme();
+        _monitor.ApplyTheme();
+        _settings.ApplyTheme();
+    }
+
+    private void OnThemeChanged(string theme)
+    {
+        I18n.ChangeTheme(theme);
+        if (Application.Current != null)
+        {
+            Application.Current.RequestedThemeVariant = theme switch
+            {
+                "dark" => ThemeVariant.Dark,
+                "light" => ThemeVariant.Light,
+                _ => ThemeVariant.Default
+            };
+        }
+        ApplyTheme();
     }
 
     private void HandleTogglePort()
