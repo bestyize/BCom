@@ -12,6 +12,27 @@
 - 导入文本发送内容、导出接收内容。
 - 中英文界面：默认跟随操作系统语言，也可以在应用内手动切换并保存。
 - 按操作系统启动计算器、编辑器、终端、截图工具等（需系统安装对应工具）。
+- **无头命令行（CLI）与 AI Agent 控制**：支持完整命令行控制、等待响应超时捕获与 JSON 机器可读格式，便于 Claude / AI Agent 自动化探测与交互。
+
+## 命令行（CLI）与 AI Agent 控制技能
+
+BCom 具有双重运行模式：无参数启动时运行现代 macOS 风格桌面图形界面；传入子命令时自动切换为无头命令行模式，供脚本或 AI Agent 调度：
+
+```bash
+# JSON 格式枚举可用串口
+bcom ports --json
+
+# 发送 AT 指令并等待 1000 毫秒捕获回复
+bcom send /dev/tty.usbserial-10 "AT" --crlf --wait 1000 --json
+
+# 发送 16 进制原始数据包（Modbus/传感器）
+bcom send COM3 "01 03 00 00 00 02 C4 0B" --hex --wait 500
+
+# 监听单片机日志输出 5000 毫秒
+bcom monitor /dev/ttyACM0 --baud 115200 --duration 5000 --json
+```
+
+项目内置针对 Claude Code 的专属控制技能：[`.claude/skills/bcom-serial/SKILL.md`](.claude/skills/bcom-serial/SKILL.md)，AI Agent 能够直接调用该技能完成微控制器探测、固件问答以及设备调试。
 
 ## 下载安装
 

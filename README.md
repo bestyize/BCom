@@ -14,6 +14,27 @@ Supported desktop platforms: **Windows, macOS, and Linux**.
 - Open text files for sending and export received data.
 - Built-in English / Simplified Chinese interface; defaults to the operating system language and supports manual switching.
 - Launch platform-appropriate utilities (calculator, editor, terminal, screenshot tool) when installed.
+- **Headless CLI & AI Agent Integration**: Automate serial interactions (list ports, query/response, binary HEX, streaming) with structured JSON output for scripts and AI agents.
+
+## Command-Line Interface (CLI) & AI Agent Skill
+
+BCom supports dual execution modes: launch without arguments for the graphical macOS-style interface, or pass subcommands for headless automation:
+
+```bash
+# List detected serial ports in JSON format
+bcom ports --json
+
+# Send ASCII / AT command with CRLF and capture response
+bcom send /dev/tty.usbserial-10 "AT" --crlf --wait 1000 --json
+
+# Send raw hexadecimal payload
+bcom send COM3 "01 03 00 00 00 02 C4 0B" --hex --wait 500
+
+# Monitor serial output for 5000ms
+bcom monitor /dev/ttyACM0 --baud 115200 --duration 5000 --json
+```
+
+A ready-to-use AI agent skill is included in [`.claude/skills/bcom-serial/SKILL.md`](.claude/skills/bcom-serial/SKILL.md) for Claude Code and automated agents to seamlessly discover and debug hardware.
 
 ## Downloads
 

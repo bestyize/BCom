@@ -8,11 +8,20 @@ namespace BCom.CrossPlatform;
 internal static class Program
 {
     [STAThread]
-    public static void Main(string[] args) =>
-        AppBuilder.Configure<App>()
+    public static int Main(string[] args)
+    {
+        // Route to headless CLI handler if command-line arguments are provided
+        if (CliHandler.IsCliInvocation(args))
+        {
+            return CliHandler.Run(args);
+        }
+
+        // Launch full cross-platform desktop UI
+        return AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .LogToTrace()
             .StartWithClassicDesktopLifetime(args);
+    }
 }
 
 public sealed class App : Application
