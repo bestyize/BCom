@@ -221,9 +221,9 @@ public sealed class MonitorView
         }
 
         _followTail.IsChecked = false;
+        _output.CaretIndex = next + query.Length;
         _output.SelectionStart = next;
         _output.SelectionEnd = next + query.Length;
-        _output.CaretIndex = next + query.Length;
         _searchOffset = next + query.Length;
         _searchStatus.Text = I18n.T("SearchFound");
     }
