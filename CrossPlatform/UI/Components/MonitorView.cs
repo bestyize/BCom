@@ -63,6 +63,7 @@ public sealed class MonitorView
     private Button? _importSendBtn;
     private Button? _clearSendBtn;
 
+    public event Action? ComposerChanged;
     public event Action? SendRequested;
     public event Action? ClearSendRequested;
     public event Action? ClearReceiveRequested;
@@ -123,6 +124,9 @@ public sealed class MonitorView
 
     public MonitorView()
     {
+        _input.TextChanged += (_, _) => ComposerChanged?.Invoke();
+        _sendHex.IsCheckedChanged += (_, _) => ComposerChanged?.Invoke();
+        _newline.IsCheckedChanged += (_, _) => ComposerChanged?.Invoke();
         _showHex.IsCheckedChanged += (_, _) => HexDisplayToggled?.Invoke(IsShowHex);
         _timeline.IsCheckedChanged += (_, _) =>
         {
