@@ -493,7 +493,8 @@ public sealed class MainWindow : Window
     {
         var session = _sessions.Active;
         _monitor.UpdateCounts(session?.Received.TotalBytes ?? 0,
-            session?.SentBytes ?? 0, session?.Received.Count ?? 0);
+            session?.SentBytes ?? 0, session?.Received.Count ?? 0,
+            session?.UiDroppedBytes ?? 0, session?.CaptureDroppedBytes ?? 0);
     }
 
     private void HandleUtilityLaunch(string kind)
