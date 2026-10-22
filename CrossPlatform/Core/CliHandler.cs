@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO.Ports;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 
 namespace BCom.CrossPlatform;
@@ -320,12 +321,9 @@ EXAMPLES FOR AI AGENTS:
 
     private static string EscapeJson(string? s)
     {
-        if (string.IsNullOrEmpty(s)) return string.Empty;
-        return s.Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n")
-                .Replace("\t", "\\t");
+        // JsonEncodedText handles all U+0000..U+001F control characters,
+        // quotes and backslashes (unlike the previous manual replacement).
+        return JsonEncodedText.Encode(s ?? string.Empty).ToString();
     }
 
     private static int HandleUnknownCommand(string command)
