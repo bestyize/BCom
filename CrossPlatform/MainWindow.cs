@@ -206,6 +206,7 @@ public sealed class MainWindow : Window
     {
         _topNav.SetConnectionStatus(isOpen, portName);
         _settings.SetConnectionState(isOpen);
+        if (!isOpen) _settings.ResetPeriodic();
     }
 
     private void HandleDataReceived(byte[] data)
