@@ -118,6 +118,7 @@ public sealed class MonitorView
 
     public void ApplySession(SerialSession? session)
     {
+        _plot.Resume();
         _restoringSession = true;
         try
         {
@@ -184,6 +185,7 @@ public sealed class MonitorView
         _followTail.Content = I18n.T("FollowTail");
         _timeline.Content = I18n.T("Timeline");
         _plotToggle.Content = I18n.T("QuickPlot");
+        _plot.RefreshLanguage();
         _searchBox.PlaceholderText = I18n.T("SearchPlaceholder");
         if (_findNextButton != null) _findNextButton.Content = I18n.T("FindNext");
         _showHex.Content = I18n.T("HexDisplay");
