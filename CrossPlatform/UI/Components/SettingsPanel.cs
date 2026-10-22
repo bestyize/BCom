@@ -18,7 +18,7 @@ public sealed class SettingsPanel
     private readonly TextBox _bauds = new()
     {
         Text = "115200",
-        Watermark = "115200",
+        PlaceholderText = "115200",
         FontFamily = MacTheme.MonoFont
     };
     private readonly ComboBox _dataBits = new();
