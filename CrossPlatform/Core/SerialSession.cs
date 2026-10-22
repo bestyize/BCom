@@ -12,6 +12,7 @@ public sealed class SerialSession : IDisposable
 {
     private bool _disposed;
     private bool _sending;
+    private SerialCapture? _capture;
 
     public SerialSession(SerialConfig config, SerialService? service = null)
     {
@@ -27,6 +28,7 @@ public sealed class SerialSession : IDisposable
         };
         Service = service ?? new SerialService();
         Service.DataReceived += OnReceived;
+        Service.RawDataReceived += OnRawReceived;
         Service.ConnectionChanged += OnConnectionChanged;
         Service.ErrorOccurred += OnError;
     }
@@ -36,6 +38,29 @@ public sealed class SerialSession : IDisposable
     public BoundedReceiveBuffer Received { get; } = new();
     public SerialTraceHistory Trace { get; } = new();
     public long SentBytes { get; private set; }
+    public bool IsRecording => System.Threading.Volatile.Read(ref _capture) != null;
+    public long CaptureDroppedBytes => System.Threading.Volatile.Read(ref _capture)?.DroppedBytes ?? 0;
+    public long UiDroppedBytes => Service.DroppedDisplayBytes;
+
+    public void StartRecording(string file)
+    {
+        if (_disposed || !IsOpen) throw new InvalidOperationException("Connect a serial port before recording.");
+        if (IsRecording) throw new InvalidOperationException("Capture already active.");
+        var writer = new SerialCapture(file, Config.PortName);
+        if (System.Threading.Interlocked.CompareExchange(ref _capture, writer, null) != null)
+        {
+            writer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            throw new InvalidOperationException("Capture already active.");
+        }
+        Changed?.Invoke(this);
+    }
+
+    public async Task StopRecordingAsync()
+    {
+        var writer = System.Threading.Interlocked.Exchange(ref _capture, null);
+        if (writer != null) await writer.DisposeAsync();
+        Changed?.Invoke(this);
+    }
     public string Draft { get; set; } = "";
     public bool SendHex { get; set; }
     public bool AppendNewLine { get; set; }
@@ -95,7 +120,9 @@ public sealed class SerialSession : IDisposable
             if (success && !_disposed)
             {
                 SentBytes += payload.Length;
-                Trace.Append(DateTimeOffset.UtcNow, Config.PortName, SerialTraceDirection.Tx, payload);
+                var timestamp = DateTimeOffset.UtcNow;
+                Trace.Append(timestamp, Config.PortName, SerialTraceDirection.Tx, payload);
+                System.Threading.Volatile.Read(ref _capture)?.TryRecord(timestamp, SerialTraceDirection.Tx, payload);
                 Changed?.Invoke(this);
             }
             return (success, error);
@@ -118,6 +145,11 @@ public sealed class SerialSession : IDisposable
         Config.RtsEnable = rts;
         Config.DtrEnable = dtr;
         if (!_disposed) Service.SetSignals(rts, dtr);
+    }
+
+    private void OnRawReceived(DateTimeOffset timestamp, byte[] data)
+    {
+        System.Threading.Volatile.Read(ref _capture)?.TryRecord(timestamp, SerialTraceDirection.Rx, data);
     }
 
     private void OnReceived(byte[] data)
@@ -147,6 +179,9 @@ public sealed class SerialSession : IDisposable
         if (_disposed) return;
         StopRepeat();
         _disposed = true;
+        var capture = System.Threading.Interlocked.Exchange(ref _capture, null);
+        if (capture != null) capture.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        Service.RawDataReceived -= OnRawReceived;
         Service.DataReceived -= OnReceived;
         Service.ConnectionChanged -= OnConnectionChanged;
         Service.ErrorOccurred -= OnError;
