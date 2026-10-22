@@ -103,6 +103,20 @@ jobs:
           fi
           find publish -type f -name '*.pdb' -delete
 
+      - name: Run serial core regression tests
+        shell: bash
+        run: dotnet test Tests/BCom.Tests.csproj -c Release --verbosity normal
+
+      - name: Smoke test published CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            ./publish/BCom.exe --help
+          else
+            ./publish/BCom --help
+          fi
+
       - name: Smoke test Linux GUI startup
         if: runner.os == 'Linux'
         shell: bash
