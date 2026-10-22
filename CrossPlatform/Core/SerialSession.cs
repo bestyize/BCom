@@ -13,6 +13,7 @@ public sealed class SerialSession : IDisposable
     private bool _disposed;
     private bool _sending;
     private SerialCapture? _capture;
+    private long _lastCaptureDroppedBytes;
 
     public SerialSession(SerialConfig config, SerialService? service = null)
     {
@@ -40,13 +41,15 @@ public sealed class SerialSession : IDisposable
     public TelemetryBuffer Telemetry { get; } = new();
     public long SentBytes { get; private set; }
     public bool IsRecording => System.Threading.Volatile.Read(ref _capture) != null;
-    public long CaptureDroppedBytes => System.Threading.Volatile.Read(ref _capture)?.DroppedBytes ?? 0;
+    public long CaptureDroppedBytes => System.Threading.Volatile.Read(ref _capture)?.DroppedBytes ??
+        System.Threading.Interlocked.Read(ref _lastCaptureDroppedBytes);
     public long UiDroppedBytes => Service.DroppedDisplayBytes;
 
     public void StartRecording(string file)
     {
         if (_disposed || !IsOpen) throw new InvalidOperationException("Connect a serial port before recording.");
         if (IsRecording) throw new InvalidOperationException("Capture already active.");
+        System.Threading.Interlocked.Exchange(ref _lastCaptureDroppedBytes, 0);
         var writer = new SerialCapture(file, Config.PortName);
         if (System.Threading.Interlocked.CompareExchange(ref _capture, writer, null) != null)
         {
@@ -59,7 +62,11 @@ public sealed class SerialSession : IDisposable
     public async Task StopRecordingAsync()
     {
         var writer = System.Threading.Interlocked.Exchange(ref _capture, null);
-        if (writer != null) await writer.DisposeAsync();
+        if (writer != null)
+        {
+            try { await writer.DisposeAsync(); }
+            finally { System.Threading.Interlocked.Exchange(ref _lastCaptureDroppedBytes, writer.DroppedBytes); }
+        }
         Changed?.Invoke(this);
     }
     public string Draft { get; set; } = "";
