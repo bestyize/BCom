@@ -95,9 +95,12 @@ public sealed class MonitorView
         RefreshLanguage();
     }
 
-    public void UpdateCounts(long rxCount, long txCount)
+    public void UpdateCounts(long rxCount, long txCount, int visibleBytes = 0)
     {
-        _rxCountBadge.Text = $"{I18n.T("RxLabel")}: {rxCount} {I18n.T("BytesUnit")}";
+        string historyHint = rxCount > visibleBytes
+            ? $" · {I18n.T("VisibleBytes")}: {visibleBytes} {I18n.T("BytesUnit")}"
+            : string.Empty;
+        _rxCountBadge.Text = $"{I18n.T("RxLabel")}: {rxCount} {I18n.T("BytesUnit")}{historyHint}";
         _txCountBadge.Text = $"{I18n.T("TxLabel")}: {txCount} {I18n.T("BytesUnit")}";
     }
 
