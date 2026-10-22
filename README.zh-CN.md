@@ -88,6 +88,14 @@ dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:P
 
 将 `<runtime-id>` 替换为 `win-x64`、`osx-arm64`、`osx-x64` 或 `linux-x64`。新的实际应用代码在 `CrossPlatform/` 下；旧 WinForms 源码及窗体资源暂时保留作迁移参考，但已排除在编译范围之外。
 
+### 串口事件时间线与日志搜索（开发中）
+
+接收区域新增可切换的**事件时间线**，以本地毫秒级时间戳、RX/TX
+收发方向、串口名称和十六进制字节展示读写事件。时间戳来自串口 API
+读写事件，**不是协议帧边界**。时间线独立限制为 128 KiB；
+搜索栏仅查找当前显示内容（忽略大小写，并支持逐条跳转），不包括已淘汰的历史。
+完整长期记录仍建议使用 `monitor --jsonl` 重定向到文件。
+
 ## 虚拟串口集成测试
 
 Linux CI 使用 Python 标准库创建伪终端（PTY），让**实际发布的 BCom CLI**
