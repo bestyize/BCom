@@ -39,6 +39,10 @@ public sealed class SerialSession : IDisposable
     public string Draft { get; set; } = "";
     public bool SendHex { get; set; }
     public bool AppendNewLine { get; set; }
+    public bool ShowHex { get; set; }
+    public bool ShowTimeline { get; set; }
+    public bool FollowOutput { get; set; } = true;
+    public string SearchQuery { get; set; } = string.Empty;
     public bool RepeatEnabled { get; private set; }
     public int RepeatIntervalMs { get; private set; } = 1000;
     public bool IsOpen => !_disposed && Service.IsOpen;
