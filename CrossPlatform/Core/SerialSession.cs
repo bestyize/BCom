@@ -37,6 +37,7 @@ public sealed class SerialSession : IDisposable
     public SerialService Service { get; }
     public BoundedReceiveBuffer Received { get; } = new();
     public SerialTraceHistory Trace { get; } = new();
+    public TelemetryBuffer Telemetry { get; } = new();
     public long SentBytes { get; private set; }
     public bool IsRecording => System.Threading.Volatile.Read(ref _capture) != null;
     public long CaptureDroppedBytes => System.Threading.Volatile.Read(ref _capture)?.DroppedBytes ?? 0;
@@ -137,6 +138,7 @@ public sealed class SerialSession : IDisposable
     {
         Received.Clear();
         Trace.Clear();
+        Telemetry.Clear();
         Changed?.Invoke(this);
     }
 
@@ -156,6 +158,7 @@ public sealed class SerialSession : IDisposable
     {
         if (_disposed || !Service.IsOpen) return;
         Received.Append(data);
+        Telemetry.Append(data);
         Trace.Append(DateTimeOffset.UtcNow, Config.PortName, SerialTraceDirection.Rx, data);
         Changed?.Invoke(this);
     }
