@@ -258,7 +258,7 @@ public sealed class MainWindow : Window
     private async Task ToggleCaptureAsync()
     {
         var session = _sessions.Active;
-        if (session?.IsOpen != true)
+        if (session == null || (!session.IsOpen && !session.IsRecording))
         {
             await MacDialog.ShowAlertAsync(this, I18n.T("ErrorNotOpen"));
             return;
@@ -301,7 +301,8 @@ public sealed class MainWindow : Window
     {
         _captureButton.Content = I18n.T(_sessions.Active?.IsRecording == true
             ? "StopCapture" : "StartCapture");
-        _captureButton.IsEnabled = _sessions.Active?.IsOpen == true;
+        _captureButton.IsEnabled = _sessions.Active?.IsOpen == true ||
+            _sessions.Active?.IsRecording == true;
     }
 
     private void HandleTogglePort()
