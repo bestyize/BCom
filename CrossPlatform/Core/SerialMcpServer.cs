@@ -78,9 +78,10 @@ public static class SerialMcpServer
                     }
                     else if (method == "tools/call")
                     {
-                        string tool = request.TryGetProperty("params", out var parameters)
+                        string tool = request.TryGetProperty("params", out var parameters) &&
+                            parameters.ValueKind == JsonValueKind.Object
                             ? GetString(parameters, "name") ?? "" : "";
-                        var arguments = request.TryGetProperty("params", out parameters) &&
+                        var arguments = parameters.ValueKind == JsonValueKind.Object &&
                             parameters.TryGetProperty("arguments", out var args) ? args : default;
                         bool authorizedSend = allowWrite && !string.IsNullOrWhiteSpace(allowedPort);
                         string result;
