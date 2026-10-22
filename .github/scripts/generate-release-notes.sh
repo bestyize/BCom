@@ -30,7 +30,7 @@ Cross-platform serial communication and debugging assistant built with **.NET 10
 | Platform | Package | Notes |
 | :--- | :--- | :--- |
 | **Windows (x64)** | \`BCom-${tag}-win-x64.zip\` | Extract and run \`BCom.exe\` |
-\${mac_rows}
+${mac_rows}
 | **Linux (x64)** | \`BCom-${tag}-linux-x64.tar.gz\` | Extract and run \`./BCom\` |
 
 All packages are self-contained and do not require a pre-installed .NET runtime.
@@ -39,7 +39,7 @@ All packages are self-contained and do not require a pre-installed .NET runtime.
 
 ### 🍎 macOS Availability
 
-\${mac_note}
+${mac_note}
 
 ---
 
