@@ -95,7 +95,7 @@ public sealed class TelemetryPlotView
                     else ctx.LineTo(point);
                 }
             }
-            _canvas.Children.Add(new Path
+            _canvas.Children.Add(new Avalonia.Controls.Shapes.Path
             {
                 Data = geometry,
                 Stroke = Strokes[ch],
