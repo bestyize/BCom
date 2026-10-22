@@ -90,6 +90,22 @@ dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:P
 
 Replace `<runtime-id>` with `win-x64`, `osx-arm64`, `osx-x64`, or `linux-x64`. The active application is in `CrossPlatform/`; the legacy WinForms source and form resources remain in the repository as a migration reference and are excluded from the build.
 
+## Automated serial integration testing
+
+On Linux, the CI pipeline tests the **published** BCom executable against a
+real pseudo-terminal (PTY). This verifies that CLI send/response and streaming
+NDJSON monitoring actually exchange raw bytes through `System.IO.Ports`,
+including non-printable bytes. The harness uses Python's standard library:
+
+```bash
+dotnet publish BCom.csproj -c Release -r linux-x64 --self-contained true -o publish
+python3 Tests/serial_pty_integration.py --binary ./publish/BCom
+```
+
+The PTY tests do **not** validate USB serial driver compatibility, hardware
+flow control, unplug/reconnect behavior, device-specific latency or sustained
+high-baud throughput. Those still require real adapters and connected devices.
+
 ## Localization
 
 The interface follows the operating system's language by default: Chinese-speaking systems use Simplified Chinese; other systems use English. Change it in the app's **Language** selector. The choice is saved in the user profile. Strings live in `CrossPlatform/I18n.cs` (English fallback and Simplified Chinese dictionary).
