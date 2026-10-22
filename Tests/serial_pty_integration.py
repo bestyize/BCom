@@ -14,6 +14,7 @@ import select
 import subprocess
 import time
 import tty
+import tempfile
 import unittest
 
 PARSER = argparse.ArgumentParser()
@@ -101,6 +102,28 @@ class BComPtyIntegrationTests(unittest.TestCase):
         self.assertTrue(all(row.get("timestamp") for row in data))
         self.assertTrue(all(row.get("port") == self.port for row in data))
         self.assertIn("4C 4F 47 3A 00 FF", " ".join(x["hex"] for x in data))
+
+    def test_verify_cli_executes_declarative_send_expect(self):
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".txt",
+                                     delete=False) as commands:
+            commands.write("AT => OK\\r\\n\\n")
+            script_path = commands.name
+        try:
+            process = self.run_cli(
+                "verify", self.port, script_path, "--wait", "1800"
+            )
+            try:
+                self.assertIn(b"AT", self.read_master_until(b"AT"))
+                os.write(self.master_fd, b"OK\\r\\n")
+                stdout, stderr = process.communicate(timeout=7)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+            self.assertEqual(0, process.returncode, stderr)
+            self.assertIn("PASS", stdout)
+        finally:
+            os.unlink(script_path)
 
     def test_indefinite_aggregate_json_is_rejected(self):
         result = subprocess.run(
