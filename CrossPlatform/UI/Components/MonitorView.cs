@@ -95,6 +95,32 @@ public sealed class MonitorView
         }
     }
 
+    /// <summary>Save tab-local composer/display options before switching tabs.</summary>
+    public void CaptureSession(SerialSession session)
+    {
+        session.Draft = SendText;
+        session.SendHex = IsSendHex;
+        session.AppendNewLine = IsNewLine;
+        session.ShowHex = IsShowHex;
+        session.ShowTimeline = IsTimelineView;
+        session.FollowOutput = _followTail.IsChecked == true;
+        session.SearchQuery = _searchBox.Text ?? "";
+    }
+
+    public void ApplySession(SerialSession? session)
+    {
+        _input.Text = session?.Draft ?? "";
+        _sendHex.IsChecked = session?.SendHex == true;
+        _newline.IsChecked = session?.AppendNewLine == true;
+        _showHex.IsChecked = session?.ShowHex == true;
+        _timeline.IsChecked = session?.ShowTimeline == true;
+        _showHex.IsEnabled = !IsTimelineView;
+        _followTail.IsChecked = session?.FollowOutput ?? true;
+        _searchBox.Text = session?.SearchQuery ?? "";
+        _searchOffset = 0;
+        _searchStatus.Text = "";
+    }
+
     public MonitorView()
     {
         _showHex.IsCheckedChanged += (_, _) => HexDisplayToggled?.Invoke(IsShowHex);
