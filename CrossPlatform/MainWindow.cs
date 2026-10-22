@@ -170,7 +170,13 @@ public sealed class MainWindow : Window
             if (!_updatingPicker)
                 _sessions.Select(_sessionPicker.SelectedItem as SerialSession);
         };
-        _newSessionButton.Click += (_, _) => _sessions.Select(null);
+        _newSessionButton.Click += (_, _) =>
+        {
+            _sessions.Select(null);
+            _settings.SelectFirstUnusedPort(_sessions.Sessions.Where(s => s.IsOpen)
+                .Select(s => s.Config.PortName));
+            RefreshConnectionControls();
+        };
 
         // Monitor View Events
         _monitor.SendRequested += HandleSendData;
