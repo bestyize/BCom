@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -15,6 +16,10 @@ namespace BCom.CrossPlatform;
 public sealed class TelemetryPlotView
 {
     private readonly Canvas _canvas = new() { Height = 154, ClipToBounds = true };
+    private readonly Button _pauseButton = new() { MinWidth = 66, Height = 26 };
+    private readonly ComboBox _range = new() { Width = 78, Height = 28 };
+    private bool _paused;
+    private int _windowSize = 512;
     private readonly TextBlock _label = new()
     {
         FontSize = 11,
@@ -34,8 +39,28 @@ public sealed class TelemetryPlotView
     public TelemetryPlotView()
     {
         var layout = new DockPanel { LastChildFill = true };
-        DockPanel.SetDock(_label, Dock.Top);
-        layout.Children.Add(_label);
+        var toolbar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"), ColumnSpacing = 6 };
+        toolbar.Children.Add(_label);
+        _pauseButton.Click += (_, _) =>
+        {
+            _paused = !_paused;
+            RefreshLanguage();
+            if (!_paused) Draw();
+        };
+        Grid.SetColumn(_pauseButton, 1);
+        toolbar.Children.Add(_pauseButton);
+        _range.ItemsSource = new[] { "128", "256", "512" };
+        _range.SelectedIndex = 2;
+        _range.SelectionChanged += (_, _) =>
+        {
+            if (int.TryParse(_range.SelectedItem as string, out int count))
+                _windowSize = count;
+            Draw();
+        };
+        Grid.SetColumn(_range, 2);
+        toolbar.Children.Add(_range);
+        DockPanel.SetDock(toolbar, Dock.Top);
+        layout.Children.Add(toolbar);
         layout.Children.Add(_canvas);
         Control = new Border
         {
@@ -45,10 +70,23 @@ public sealed class TelemetryPlotView
             Child = layout
         };
         _canvas.SizeChanged += (_, _) => Draw();
+        RefreshLanguage();
+    }
+
+    public void RefreshLanguage()
+    {
+        _pauseButton.Content = I18n.T(_paused ? "PlotResume" : "PlotPause");
+    }
+
+    public void Resume()
+    {
+        _paused = false;
+        RefreshLanguage();
     }
 
     public void Update(IReadOnlyList<double[]> samples)
     {
+        if (_paused) return;
         _samples = samples;
         Draw();
     }
@@ -59,13 +97,13 @@ public sealed class TelemetryPlotView
         double width = Math.Max(0, _canvas.Bounds.Width - 8);
         double height = _canvas.Height - 10;
         if (width < 10 || _samples.Count < 2) return;
-
+        var visible = _samples.Skip(Math.Max(0, _samples.Count - _windowSize)).ToArray();
         int channels = 0;
-        foreach (var row in _samples) channels = Math.Max(channels, row.Length);
+        foreach (var row in visible) channels = Math.Max(channels, row.Length);
         for (int ch = 0; ch < Math.Min(8, channels); ch++)
         {
             double min = double.PositiveInfinity, max = double.NegativeInfinity;
-            foreach (var row in _samples)
+            foreach (var row in visible)
             {
                 if (ch >= row.Length) continue;
                 min = Math.Min(min, row[ch]);
@@ -77,15 +115,15 @@ public sealed class TelemetryPlotView
             using (var ctx = geometry.Open())
             {
                 bool started = false;
-                for (int i = 0; i < _samples.Count; i++)
+                for (int i = 0; i < visible.Length; i++)
                 {
-                    if (ch >= _samples[i].Length)
+                    if (ch >= visible[i].Length)
                     {
                         started = false;
                         continue;
                     }
-                    double x = 4 + width * i / Math.Max(1, _samples.Count - 1);
-                    double y = 5 + height * (1 - (_samples[i][ch] - min) / range);
+                    double x = 4 + width * i / Math.Max(1, visible.Length - 1);
+                    double y = 5 + height * (1 - (visible[i][ch] - min) / range);
                     var point = new Point(x, y);
                     if (!started)
                     {
@@ -102,6 +140,6 @@ public sealed class TelemetryPlotView
                 StrokeThickness = 1.7
             });
         }
-        _label.Text = I18n.Format("PlotSamples", _samples.Count, Math.Min(channels, 8));
+        _label.Text = I18n.Format("PlotSamples", visible.Length, Math.Min(channels, 8));
     }
 }
