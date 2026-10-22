@@ -333,7 +333,7 @@ public sealed class MainWindow : Window
 
     private void UpdateCounts()
     {
-        _monitor.UpdateCounts(_receivedBuffer.TotalBytes, _sentBytes);
+        _monitor.UpdateCounts(_receivedBuffer.TotalBytes, _sentBytes, _receivedBuffer.Count);
     }
 
     private void HandleUtilityLaunch(string kind)
