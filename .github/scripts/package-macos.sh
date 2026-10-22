@@ -139,6 +139,8 @@ else
   hdiutil create -volname "BCom" -srcfolder "$stage" \
     -format UDZO -ov "$dmg"
   hdiutil verify "$dmg"
-  echo "Ad-hoc signed DMG created: $dmg"
+  # Preserve CI artifacts for testing, but exclude unnotarized images from official Releases.
+  touch "$dmg.unnotarized"
+  echo "Ad-hoc signed DMG created (CI-only, not a release installer): $dmg"
   echo "::notice::macOS package created with ad-hoc signature. Users can open via Gatekeeper override (xattr -cr /Applications/BCom.app)."
 fi
