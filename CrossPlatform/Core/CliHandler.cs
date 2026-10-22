@@ -200,7 +200,7 @@ EXAMPLES FOR AI AGENTS:
             Console.Error.WriteLine("Write permission requires an explicitly allowed port.");
             return 2;
         }
-        SerialMcpServer.RunAsync(Console.In, Console.Out, allowWrite, port)
+        SerialMcpServer.RunAsync(Console.In, Console.Out, allowWrite, port, audit: Console.Error)
             .GetAwaiter().GetResult();
         return 0;
     }
