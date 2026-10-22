@@ -291,6 +291,7 @@ public sealed class MainWindow : Window
         {
             _topNav.SetConnectionStatus(connected, session.Config.PortName);
             _settings.SetConnectionState(connected);
+            if (!connected) _settings.ResetPeriodic();
         }
         RefreshSessionPicker();
         RefreshConnectionControls();
