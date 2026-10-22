@@ -137,6 +137,9 @@ HEX:01 03 00 00 00 0A C5 CD => HEX:01 03
 
 ```bash
 BCom verify COM3 commands.txt --baud 115200 --wait 1500
+BCom decode session.bcomcap lf
+BCom decode session.bcomcap fixed:8 --crc
+BCom decode session.bcomcap length
 ```
 
 Tests stop at the first failing response. Each step is capped at 4 KiB,
