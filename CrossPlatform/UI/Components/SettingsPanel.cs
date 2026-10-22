@@ -195,6 +195,16 @@ public sealed class SettingsPanel
         PortSelectionChanged?.Invoke();
     }
 
+    /// <summary>Select an unoccupied port for a new connection; keep it blank if none exist.</summary>
+    public void SelectFirstUnusedPort(System.Collections.Generic.IEnumerable<string> used)
+    {
+        var occupied = new System.Collections.Generic.HashSet<string>(
+            used, StringComparer.OrdinalIgnoreCase);
+        var available = _ports.ItemsSource as string[] ?? Array.Empty<string>();
+        _ports.SelectedItem = available.FirstOrDefault(p => !occupied.Contains(p));
+        PortSelectionChanged?.Invoke();
+    }
+
     public void SetConnectionState(bool isOpen)
     {
         _isOpen = isOpen;
