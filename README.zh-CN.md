@@ -112,14 +112,21 @@ PTY 不能替代真实 USB-UART 硬件测试：USB 驱动兼容性、RTS/CTS 硬
 
 ### 发布 Release 的两种方式：
 
+v3.3.0 新增有界接收历史、后台串口发送、自定义波特率、
+连接配置持久化、NDJSON 流式监控与 Linux PTY 集成测试。
+通过审核后合并到 `master` 时，若合并提交包含 `[publish-release]`，
+CI 也会将构建通过的提交直接发布成带版本标签的 GitHub Release。
+macOS 正式安装包仍以 Apple 签名及公证成功为前提。
+
+
 1. **推送版本 Tag（推荐）**：
    ```bash
-   git tag v3.2.0
-   git push origin v3.2.0
+   git tag v3.3.0
+   git push origin v3.3.0
    ```
 2. **在 GitHub Actions 页面手动触发**：
    - 进入 Actions -> 选择 **Build and release BCom** 工作流。
-   - 点击 **Run workflow**，勾选 `Publish as GitHub Release`，输入标签名称（如 `v3.2.0`）。
+   - 点击 **Run workflow**，勾选 `Publish as GitHub Release`，输入标签名称（如 `v3.3.0`）。
 
 流水线自动校验构建产物并生成 SHA-256 校验和。Windows/Linux 安装包正常发布；macOS DMG 只有完成 Developer ID 签名及 Apple 官方公证后才进入 Release，未公证的包仅作为 CI 测试产物。
 
@@ -134,8 +141,8 @@ PTY 不能替代真实 USB-UART 硬件测试：USB 驱动兼容性、RTS/CTS 硬
 Apple Developer ID 及公证要求付费开发者账号。请勿把证书或密码提交到仓库。只配置了一部分密钥时，正式 macOS 打包会报错，避免发布错误产物。
 
 ```bash
-git tag v3.2.0
-git push origin v3.2.0
+git tag v3.3.0
+git push origin v3.3.0
 ```
 
 参考 [Apple 开发者分发指南](https://developer.apple.com/macos/distribution) 与 [Avalonia macOS 打包说明](https://docs.avaloniaui.net/docs/deployment/macos)。

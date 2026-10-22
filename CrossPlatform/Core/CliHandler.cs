@@ -43,7 +43,7 @@ public static class CliHandler
 
     private static void PrintUsage()
     {
-        Console.WriteLine(@"BCom Serial Monitor & Automation CLI (v3.2.0)
+        Console.WriteLine(@"BCom Serial Monitor & Automation CLI (v3.3.0)
 
 USAGE:
   bcom [command] [options]

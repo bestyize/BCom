@@ -116,14 +116,24 @@ GitHub Actions builds packages for Windows, macOS Intel, macOS Apple Silicon, an
 
 ### Publishing Releases
 
+The v3.3.0 release adds bounded GUI receive history, reliable background serial
+writes, custom baud rates, persistent connection profiles, streamed NDJSON output
+and Linux PTY integration tests.
+
+A maintainer can also publish directly from a reviewed merge into `master`
+by including `[publish-release]` in the **merge commit message**. The release
+workflow tags the exact built commit, and publishes Windows/Linux packages.
+macOS DMGs are only attached when Apple notarization is configured and succeeds.
+
+
 1. **Via Git Tag (Recommended)**:
    ```bash
-   git tag v3.2.0
-   git push origin v3.2.0
+   git tag v3.3.0
+   git push origin v3.3.0
    ```
 2. **Via GitHub Actions Manual Dispatch**:
    - Go to the **Actions** tab -> select **Build and release BCom**.
-   - Click **Run workflow**, check `Publish as GitHub Release`, and enter the version tag (e.g. `v3.2.0`).
+   - Click **Run workflow**, check `Publish as GitHub Release`, and enter the version tag (e.g. `v3.3.0`).
 
 The pipeline validates package archives, generates SHA-256 checksums, and publishes Windows/Linux installers. macOS DMGs are published to the Release only after Developer ID signing and notarization; unnotarized DMGs are CI-only test artifacts.
 
@@ -138,8 +148,8 @@ If you have an Apple Developer account, configure the following repository secre
 Developer ID signing and notarization require a paid Apple Developer Program membership. Never commit a certificate or password to this repository. If a release is tagged with a partially configured credential set, the macOS job fails rather than publishing an invalid package.
 
 ```bash
-git tag v3.2.0
-git push origin v3.2.0
+git tag v3.3.0
+git push origin v3.3.0
 ```
 
 See Apple's [Developer ID distribution guidance](https://developer.apple.com/macos/distribution) and [Avalonia macOS packaging instructions](https://docs.avaloniaui.net/docs/deployment/macos).
