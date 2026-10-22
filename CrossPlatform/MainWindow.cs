@@ -414,6 +414,7 @@ public sealed class MainWindow : Window
                 : _monitor.IsShowHex
                     ? SerialDataConverter.ToHexString(bytes)
                     : SerialDataConverter.ToUtf8String(bytes);
+        _monitor.UpdatePlot(session?.Telemetry);
         UpdateCounts();
     }
 
