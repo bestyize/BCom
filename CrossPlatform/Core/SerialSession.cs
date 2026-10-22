@@ -67,6 +67,7 @@ public sealed class SerialSession : IDisposable
     public bool AppendNewLine { get; set; }
     public bool ShowHex { get; set; }
     public bool ShowTimeline { get; set; }
+    public bool PlotEnabled { get; set; }
     public bool FollowOutput { get; set; } = true;
     public string SearchQuery { get; set; } = string.Empty;
     public bool RepeatEnabled { get; private set; }
