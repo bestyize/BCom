@@ -30,6 +30,7 @@ public static class CliHandler
             "ping" => PingPort(cmdArgs),
             "send" => SendData(cmdArgs),
             "monitor" or "read" => MonitorPort(cmdArgs),
+            "replay" => ReplayCapture(cmdArgs),
             _ => HandleUnknownCommand(command)
         };
     }
@@ -53,6 +54,7 @@ COMMANDS:
   ping <port>                 Verify that a serial port can be opened
   send <port> <data>          Send ASCII or HEX payload and optionally read reply
   monitor <port>              Listen on a serial port and stream received data
+  replay <file.bcomcap>       Replay a recorded capture as timestamped JSONL
   gui                         Launch graphical desktop interface (default)
   help, --help, -h            Show this command reference
 
@@ -77,6 +79,46 @@ EXAMPLES FOR AI AGENTS:
   bcom send /dev/tty.usbserial-10 ""AT"" --crlf --wait 1000 --json
   bcom send COM3 ""0A FF 12"" --hex --wait 500
   bcom monitor /dev/ttyACM0 --baud 9600 --duration 3000");
+    }
+
+    private static int ReplayCapture(string[] args)
+    {
+        if (args.Length != 1)
+        {
+            Console.Error.WriteLine("Usage: bcom replay <file.bcomcap>");
+            return 2;
+        }
+        try
+        {
+            ReplayToConsoleAsync(args[0]).GetAwaiter().GetResult();
+            return 0;
+        }
+        catch (Exception e) when (e is System.IO.IOException or System.IO.InvalidDataException
+            or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine(e.Message);
+            return 1;
+        }
+    }
+
+    private static async System.Threading.Tasks.Task ReplayToConsoleAsync(string file)
+    {
+        await foreach (var entry in SerialCapture.ReplayAsync(file))
+        {
+            var writer = new System.Buffers.ArrayBufferWriter<byte>();
+            using (var json = new Utf8JsonWriter(writer))
+            {
+                json.WriteStartObject();
+                json.WriteString("timestamp", entry.Timestamp);
+                json.WriteString("port", entry.Port);
+                json.WriteString("direction", entry.Direction == SerialTraceDirection.Rx ? "rx" : "tx");
+                json.WriteNumber("bytes", entry.Data.Length);
+                json.WriteString("hex", SerialDataConverter.ToHexString(entry.Data));
+                json.WriteEndObject();
+                json.Flush();
+            }
+            Console.WriteLine(Encoding.UTF8.GetString(writer.WrittenSpan));
+        }
     }
 
     private static int ListPorts(string[] args)
