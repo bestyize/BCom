@@ -107,6 +107,23 @@ dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:P
 搜索栏仅查找当前显示内容（忽略大小写，并支持逐条跳转），不包括已淘汰的历史。
 完整长期记录仍建议使用 `monitor --jsonl` 重定向到文件。
 
+### 原始数据录制与回放（阶段 A）
+
+在已连接的会话中点击「开始录制」可保存 `.bcomcap` 文件，包含 RX / TX
+方向、UTC 时间戳和完整字节。后台录制独立于 UI 日志，每 64 MiB 自动轮转
+到 `.part001` 等文件。录制队列容量有限；磁盘来不及写入时会记录丢弃
+字节数，不会无限增长内存。停止录制时会刷盘。
+
+无需连接设备即可通过 CLI 回放单个文件：
+
+```bash
+BCom replay session.bcomcap
+BCom replay session.bcomcap.part001
+```
+
+回放结果是 JSONL。注意时间戳记录的是串口 API 回调时间，而非每个字节
+或协议帧的精确时刻；多分卷应按序读取。界面缓冲区有独立的容量限制。
+
 ## 虚拟串口集成测试
 
 Linux CI 使用 Python 标准库创建伪终端（PTY），让**实际发布的 BCom CLI**
