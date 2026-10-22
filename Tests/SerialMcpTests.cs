@@ -39,6 +39,19 @@ public sealed class SerialMcpTests
     }
 
     [Fact]
+    public async Task AuditRecordsDeniedDeviceAccessWithoutIncludingPayload()
+    {
+        using var input = new StringReader(
+            "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":5,\\"method\\":\\"tools/call\\",\\"params\\":{\\"name\\":\\"serial_send\\",\\"arguments\\":{\\"data\\":\\"SECRET\\\\"}}}\\n");
+        using var output = new StringWriter();
+        using var audit = new StringWriter();
+        await SerialMcpServer.RunAsync(input, output, audit: audit);
+        Assert.Contains("tool=serial_send", audit.ToString());
+        Assert.Contains("outcome=error", audit.ToString());
+        Assert.DoesNotContain("SECRET", audit.ToString());
+    }
+
+    [Fact]
     public async Task UnsafeArgsDoNotTerminateService()
     {
         using var input = new StringReader(
