@@ -15,7 +15,12 @@ namespace BCom.CrossPlatform;
 public sealed class SettingsPanel
 {
     private readonly ComboBox _ports = new();
-    private readonly ComboBox _bauds = new();
+    private readonly TextBox _bauds = new()
+    {
+        Text = "115200",
+        Watermark = "115200",
+        FontFamily = MacTheme.MonoFont
+    };
     private readonly ComboBox _dataBits = new();
     private readonly ComboBox _stopBits = new();
     private readonly ComboBox _parities = new();
@@ -76,12 +81,10 @@ public sealed class SettingsPanel
 
     public SettingsPanel()
     {
-        _bauds.ItemsSource = SerialConfig.BaudRates.Select(x => x.ToString()).ToArray();
         _dataBits.ItemsSource = SerialConfig.DataBitsOptions.Select(x => x.ToString()).ToArray();
         _stopBits.ItemsSource = SerialConfig.StopBitsOptions.Select(x => x.ToString()).ToArray();
         _parities.ItemsSource = SerialConfig.ParityOptions.Select(x => x.ToString()).ToArray();
 
-        _bauds.SelectedIndex = 3;
         _dataBits.SelectedIndex = 0;
         _stopBits.SelectedIndex = 0;
         _parities.SelectedIndex = 0;
@@ -114,13 +117,20 @@ public sealed class SettingsPanel
         return new SerialConfig
         {
             PortName = _ports.SelectedItem as string ?? string.Empty,
-            BaudRate = SerialConfig.BaudRates[Math.Max(0, _bauds.SelectedIndex)],
+            BaudRate = ReadBaudRate(),
             DataBits = SerialConfig.DataBitsOptions[Math.Max(0, _dataBits.SelectedIndex)],
             StopBits = SerialConfig.StopBitsOptions[Math.Max(0, _stopBits.SelectedIndex)],
             Parity = SerialConfig.ParityOptions[Math.Max(0, _parities.SelectedIndex)],
             RtsEnable = _rts.IsChecked == true,
             DtrEnable = _dtr.IsChecked == true
         };
+    }
+
+    private int ReadBaudRate()
+    {
+        if (int.TryParse(_bauds.Text, out int rate) && rate is >= 1 and <= 10000000)
+            return rate;
+        throw new ArgumentException(I18n.T("ErrorBaud"));
     }
 
     public void SetAvailablePorts(string[] ports)
