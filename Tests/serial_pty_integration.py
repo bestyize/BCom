@@ -125,6 +125,24 @@ class BComPtyIntegrationTests(unittest.TestCase):
         finally:
             os.unlink(script_path)
 
+    def test_mcp_defaults_to_read_only(self):
+        initialize = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize"})
+        list_tools = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+        try_write = json.dumps({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                                "params": {"name": "serial_send",
+                                           "arguments": {"data": "AT"}}})
+        result = subprocess.run(
+            [BINARY, "mcp"],
+            input="\\n".join([initialize, list_tools, try_write, ""]),
+            capture_output=True, text=True, timeout=6,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        messages = [json.loads(x) for x in result.stdout.splitlines() if x.strip()]
+        self.assertEqual(3, len(messages))
+        tool_names = [t["name"] for t in messages[1]["result"]["tools"]]
+        self.assertEqual(["serial_list_ports"], tool_names)
+        self.assertTrue(messages[2]["result"]["isError"])
+
     def test_indefinite_aggregate_json_is_rejected(self):
         result = subprocess.run(
             [BINARY, "monitor", self.port, "--duration", "0", "--json"],
