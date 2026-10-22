@@ -42,7 +42,7 @@ public sealed class SerialCapture : IAsyncDisposable
         {
             SingleReader = true,
             SingleWriter = false,
-            FullMode = BoundedChannelFullMode.DropWrite
+            FullMode = BoundedChannelFullMode.Wait
         });
         _writerTask = Task.Run(WriteLoopAsync);
     }
