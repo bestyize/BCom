@@ -69,6 +69,7 @@ public sealed class SettingsPanel
     private TextBlock? _msLabel;
     private Button? _refreshBtn;
     private bool _isOpen;
+    private string _preferredPort = string.Empty;
 
     public event Action? TogglePortRequested;
     public event Action? RefreshPortsRequested;
@@ -88,6 +89,7 @@ public sealed class SettingsPanel
         _dataBits.SelectedIndex = 0;
         _stopBits.SelectedIndex = 0;
         _parities.SelectedIndex = 0;
+        ApplySavedProfile();
 
         _ports.HorizontalAlignment = HorizontalAlignment.Stretch;
         _bauds.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -126,6 +128,20 @@ public sealed class SettingsPanel
         };
     }
 
+    private void ApplySavedProfile()
+    {
+        var profile = SerialProfileStore.Load();
+        if (profile == null) return;
+
+        _preferredPort = profile.PortName;
+        _bauds.Text = profile.BaudRate.ToString();
+        _dataBits.SelectedIndex = Math.Max(0, Array.IndexOf(SerialConfig.DataBitsOptions, profile.DataBits));
+        _stopBits.SelectedIndex = Math.Max(0, Array.IndexOf(SerialConfig.StopBitsOptions, profile.StopBits));
+        _parities.SelectedIndex = Math.Max(0, Array.IndexOf(SerialConfig.ParityOptions, profile.Parity));
+        _rts.IsChecked = profile.RtsEnable;
+        _dtr.IsChecked = profile.DtrEnable;
+    }
+
     private int ReadBaudRate()
     {
         if (int.TryParse(_bauds.Text, out int rate) && rate is >= 1 and <= 10000000)
@@ -138,7 +154,11 @@ public sealed class SettingsPanel
         var current = _ports.SelectedItem as string;
         if ((_ports.ItemsSource as string[])?.SequenceEqual(ports) == true) return;
         _ports.ItemsSource = ports;
-        _ports.SelectedItem = ports.Contains(current) ? current : ports.FirstOrDefault();
+        _ports.SelectedItem = ports.Contains(current)
+            ? current
+            : ports.Contains(_preferredPort)
+                ? _preferredPort
+                : ports.FirstOrDefault();
     }
 
     public void SetConnectionState(bool isOpen)
