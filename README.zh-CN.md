@@ -88,6 +88,20 @@ dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:P
 
 将 `<runtime-id>` 替换为 `win-x64`、`osx-arm64`、`osx-x64` 或 `linux-x64`。新的实际应用代码在 `CrossPlatform/` 下；旧 WinForms 源码及窗体资源暂时保留作迁移参考，但已排除在编译范围之外。
 
+## 虚拟串口集成测试
+
+Linux CI 使用 Python 标准库创建伪终端（PTY），让**实际发布的 BCom CLI**
+通过 `System.IO.Ports` 与模拟串口设备交换原始字节。测试覆盖发送/应答、
+带 NUL 的 JSON 结果、NDJSON 持续事件输出和错误参数校验。
+
+```bash
+dotnet publish BCom.csproj -c Release -r linux-x64 --self-contained true -o publish
+python3 Tests/serial_pty_integration.py --binary ./publish/BCom
+```
+
+PTY 不能替代真实 USB-UART 硬件测试：USB 驱动兼容性、RTS/CTS 硬件流控、
+设备热拔插和持续高波特率压力测试仍需使用真实设备验证。
+
 ## 语言切换
 
 应用默认跟随系统语言：中文系统显示简体中文，其他语言显示英文。也可通过界面右上方的 **Language / 语言** 选择器切换为英文或简体中文，并自动保存设置。翻译统一维护在 `CrossPlatform/I18n.cs`。
