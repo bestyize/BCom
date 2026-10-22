@@ -35,6 +35,7 @@ public sealed class MainWindow : Window
 
     private Border? _bottomBar;
     private long _sentBytes;
+    private bool _sendBusy;
     private string _statusKey = "StatusReady";
     private object[] _statusArguments = Array.Empty<object>();
     private bool _compact;
@@ -223,8 +224,10 @@ public sealed class MainWindow : Window
         UpdateCounts();
     }
 
-    private void HandleSendData()
+    private async void HandleSendData()
     {
+        // A slow device must not accumulate an unbounded queue of timer sends.
+        if (_sendBusy) return;
         if (!_serial.IsOpen)
         {
             _ = MacDialog.ShowAlertAsync(this, I18n.T("ErrorNotOpen"));
@@ -243,14 +246,23 @@ public sealed class MainWindow : Window
             return;
         }
 
-        if (_serial.Write(payload, out var writeError))
+        _sendBusy = true;
+        try
         {
-            _sentBytes += payload.Length;
-            UpdateCounts();
+            var (success, writeError) = await _serial.WriteAsync(payload);
+            if (success)
+            {
+                _sentBytes += payload.Length;
+                UpdateCounts();
+            }
+            else if (writeError != null && _serial.IsOpen)
+            {
+                _ = MacDialog.ShowAlertAsync(this, writeError);
+            }
         }
-        else if (writeError != null)
+        finally
         {
-            _ = MacDialog.ShowAlertAsync(this, writeError);
+            _sendBusy = false;
         }
     }
 
