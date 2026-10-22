@@ -70,9 +70,11 @@ public sealed class SettingsPanel
     private Button? _refreshBtn;
     private bool _isOpen;
     private string _preferredPort = string.Empty;
+    private bool _applyingSession;
 
     public event Action? TogglePortRequested;
     public event Action? RefreshPortsRequested;
+    public event Action? PortSelectionChanged;
     public event Action<bool, bool>? SignalsChanged;
     public event Action<bool, int>? PeriodicChanged;
 
@@ -103,6 +105,7 @@ public sealed class SettingsPanel
         _stopBits.CornerRadius = new CornerRadius(7);
         _parities.CornerRadius = new CornerRadius(7);
 
+        _ports.SelectionChanged += (_, _) => { if (!_applyingSession) PortSelectionChanged?.Invoke(); };
         _openButton.Click += (_, _) => TogglePortRequested?.Invoke();
         _rts.IsCheckedChanged += (_, _) => OnSignalsChanged();
         _dtr.IsCheckedChanged += (_, _) => OnSignalsChanged();
@@ -142,6 +145,31 @@ public sealed class SettingsPanel
         _dtr.IsChecked = profile.DtrEnable;
     }
 
+    /// <summary>Restores controls for an already-open session without mutating that connection.</summary>
+    public void ApplySession(SerialConfig config, bool repeat, int intervalMs)
+    {
+        _applyingSession = true;
+        try
+        {
+            _preferredPort = config.PortName;
+            _ports.SelectedItem = (_ports.ItemsSource as string[])?.FirstOrDefault(
+                p => string.Equals(p, config.PortName, StringComparison.OrdinalIgnoreCase));
+            _bauds.Text = config.BaudRate.ToString();
+            _dataBits.SelectedIndex = Math.Max(0, Array.IndexOf(SerialConfig.DataBitsOptions, config.DataBits));
+            _stopBits.SelectedIndex = Math.Max(0, Array.IndexOf(SerialConfig.StopBitsOptions, config.StopBits));
+            _parities.SelectedIndex = Math.Max(0, Array.IndexOf(SerialConfig.ParityOptions, config.Parity));
+            _rts.IsChecked = config.RtsEnable;
+            _dtr.IsChecked = config.DtrEnable;
+            _interval.Text = intervalMs.ToString();
+            _periodic.IsChecked = repeat;
+        }
+        finally
+        {
+            _applyingSession = false;
+        }
+        SetConnectionState(true);
+    }
+
     private int ReadBaudRate()
     {
         if (int.TryParse(_bauds.Text, out int rate) && rate is >= 1 and <= 10000000)
@@ -153,12 +181,28 @@ public sealed class SettingsPanel
     {
         var current = _ports.SelectedItem as string;
         if ((_ports.ItemsSource as string[])?.SequenceEqual(ports) == true) return;
-        _ports.ItemsSource = ports;
-        _ports.SelectedItem = ports.Contains(current)
-            ? current
-            : ports.Contains(_preferredPort)
-                ? _preferredPort
-                : ports.FirstOrDefault();
+        _applyingSession = true;
+        try
+        {
+            _ports.ItemsSource = ports;
+            _ports.SelectedItem = ports.Contains(current)
+                ? current
+                : ports.Contains(_preferredPort)
+                    ? _preferredPort
+                    : ports.FirstOrDefault();
+        }
+        finally { _applyingSession = false; }
+        PortSelectionChanged?.Invoke();
+    }
+
+    /// <summary>Select an unoccupied port for a new connection; keep it blank if none exist.</summary>
+    public void SelectFirstUnusedPort(System.Collections.Generic.IEnumerable<string> used)
+    {
+        var occupied = new System.Collections.Generic.HashSet<string>(
+            used, StringComparer.OrdinalIgnoreCase);
+        var available = _ports.ItemsSource as string[] ?? Array.Empty<string>();
+        _ports.SelectedItem = available.FirstOrDefault(p => !occupied.Contains(p));
+        PortSelectionChanged?.Invoke();
     }
 
     public void SetConnectionState(bool isOpen)
@@ -232,14 +276,14 @@ public sealed class SettingsPanel
 
     private void OnSignalsChanged()
     {
-        SignalsChanged?.Invoke(_rts.IsChecked == true, _dtr.IsChecked == true);
+        if (!_applyingSession) SignalsChanged?.Invoke(_rts.IsChecked == true, _dtr.IsChecked == true);
     }
 
     private void OnPeriodicChanged()
     {
         bool enabled = _periodic.IsChecked == true;
         int ms = int.TryParse(_interval.Text, out var val) ? val : 0;
-        PeriodicChanged?.Invoke(enabled, ms);
+        if (!_applyingSession) PeriodicChanged?.Invoke(enabled, ms);
     }
 
     private Border BuildView()

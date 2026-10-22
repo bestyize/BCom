@@ -41,6 +41,7 @@ public sealed class MonitorView
     private readonly TextBlock _searchStatus = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
     private Button? _findNextButton;
     private int _searchOffset;
+    private bool _restoringSession;
 
     private readonly CheckBox _followTail = new() { FontSize = 12, IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _showHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
@@ -63,6 +64,7 @@ public sealed class MonitorView
     private Button? _importSendBtn;
     private Button? _clearSendBtn;
 
+    public event Action? ComposerChanged;
     public event Action? SendRequested;
     public event Action? ClearSendRequested;
     public event Action? ClearReceiveRequested;
@@ -95,8 +97,42 @@ public sealed class MonitorView
         }
     }
 
+    /// <summary>Save tab-local composer/display options before switching tabs.</summary>
+    public void CaptureSession(SerialSession session)
+    {
+        session.Draft = SendText;
+        session.SendHex = IsSendHex;
+        session.AppendNewLine = IsNewLine;
+        session.ShowHex = IsShowHex;
+        session.ShowTimeline = IsTimelineView;
+        session.FollowOutput = _followTail.IsChecked == true;
+        session.SearchQuery = _searchBox.Text ?? "";
+    }
+
+    public void ApplySession(SerialSession? session)
+    {
+        _restoringSession = true;
+        try
+        {
+            _input.Text = session?.Draft ?? "";
+            _sendHex.IsChecked = session?.SendHex == true;
+            _newline.IsChecked = session?.AppendNewLine == true;
+            _showHex.IsChecked = session?.ShowHex == true;
+            _timeline.IsChecked = session?.ShowTimeline == true;
+            _showHex.IsEnabled = !IsTimelineView;
+            _followTail.IsChecked = session?.FollowOutput ?? true;
+            _searchBox.Text = session?.SearchQuery ?? "";
+            _searchOffset = 0;
+            _searchStatus.Text = "";
+        }
+        finally { _restoringSession = false; }
+    }
+
     public MonitorView()
     {
+        _input.TextChanged += (_, _) => { if (!_restoringSession) ComposerChanged?.Invoke(); };
+        _sendHex.IsCheckedChanged += (_, _) => { if (!_restoringSession) ComposerChanged?.Invoke(); };
+        _newline.IsCheckedChanged += (_, _) => { if (!_restoringSession) ComposerChanged?.Invoke(); };
         _showHex.IsCheckedChanged += (_, _) => HexDisplayToggled?.Invoke(IsShowHex);
         _timeline.IsCheckedChanged += (_, _) =>
         {

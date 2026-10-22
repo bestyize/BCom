@@ -90,7 +90,23 @@ dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:P
 
 Replace `<runtime-id>` with `win-x64`, `osx-arm64`, `osx-x64`, or `linux-x64`. The active application is in `CrossPlatform/`; the legacy WinForms source and form resources remain in the repository as a migration reference and are excluded from the build.
 
-### Serial event timeline and search (in development)
+### Multiple serial connections (development)
+
+A new connection selector above the receive pane allows simultaneous open
+serial ports. Choose **New connection**, select an available port in the
+serial settings panel, and click **Open port**. Choose an existing connection
+in the selector to view and send through it; switching views does not close
+other ports. Closing a port from the settings panel removes only that port's
+session. Each live session owns its own 128 KiB receive history, 128 KiB
+timestamped event history, RX/TX counters, draft, send mode, repeat timer
+and search/view preferences.
+
+Only the **selected** session is displayed or exported. The port dropdown
+selects the physical port to open/close; the session selector chooses which
+connection to inspect. This version does not persist multiple connections
+across application restarts or merge logs from multiple ports.
+
+## Serial event timeline and search (in development)
 
 The next development branch adds a switchable **event timeline** to the
 receive pane. Each low-level serial read or completed write is shown with
