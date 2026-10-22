@@ -36,6 +36,12 @@ public sealed class MonitorView
         BorderThickness = new Thickness(1)
     };
 
+    private readonly CheckBox _timeline = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBox _searchBox = new() { MinWidth = 160, FontSize = 12, Height = 30 };
+    private readonly TextBlock _searchStatus = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
+    private Button? _findNextButton;
+    private int _searchOffset;
+
     private readonly CheckBox _followTail = new() { FontSize = 12, IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _showHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _sendHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
@@ -63,9 +69,11 @@ public sealed class MonitorView
     public event Action? ImportFileRequested;
     public event Action? ExportReceiveRequested;
     public event Action<bool>? HexDisplayToggled;
+    public event Action<bool>? TimelineDisplayToggled;
 
     public Control Control { get; }
 
+    public bool IsTimelineView => _timeline.IsChecked == true;
     public bool IsShowHex => _showHex.IsChecked == true;
     public bool IsSendHex => _sendHex.IsChecked == true;
     public bool IsNewLine => _newline.IsChecked == true;
@@ -90,6 +98,16 @@ public sealed class MonitorView
     public MonitorView()
     {
         _showHex.IsCheckedChanged += (_, _) => HexDisplayToggled?.Invoke(IsShowHex);
+        _timeline.IsCheckedChanged += (_, _) =>
+        {
+            _showHex.IsEnabled = !IsTimelineView;
+            TimelineDisplayToggled?.Invoke(IsTimelineView);
+        };
+        _searchBox.TextChanged += (_, _) =>
+        {
+            _searchOffset = 0;
+            _searchStatus.Text = string.Empty;
+        };
         Control = BuildView();
         ApplyTheme();
         RefreshLanguage();
@@ -115,6 +133,9 @@ public sealed class MonitorView
         if (_sendButton != null) _sendButton.Content = I18n.T("Send");
 
         _followTail.Content = I18n.T("FollowTail");
+        _timeline.Content = I18n.T("Timeline");
+        _searchBox.PlaceholderText = I18n.T("SearchPlaceholder");
+        if (_findNextButton != null) _findNextButton.Content = I18n.T("FindNext");
         _showHex.Content = I18n.T("HexDisplay");
         _sendHex.Content = I18n.T("HexSend");
         _newline.Content = I18n.T("NewLine");
@@ -147,6 +168,11 @@ public sealed class MonitorView
         if (_receiveTitle != null) _receiveTitle.Foreground = MacTheme.TextPrimary;
         if (_sendTitle != null) _sendTitle.Foreground = MacTheme.TextPrimary;
         if (_shortcutHint != null) _shortcutHint.Foreground = MacTheme.TextMuted;
+        _searchBox.Background = MacTheme.BgEditor;
+        _searchBox.Foreground = MacTheme.TextPrimary;
+        _searchBox.BorderBrush = MacTheme.BorderMuted;
+        _searchStatus.Foreground = MacTheme.TextMuted;
+        UpdateSecondaryButton(_findNextButton);
 
         if (_rxBadgeBorder != null)
         {
@@ -176,6 +202,32 @@ public sealed class MonitorView
         button.BorderBrush = MacTheme.BorderMuted;
     }
 
+    private void FindNext()
+    {
+        string query = _searchBox.Text ?? string.Empty;
+        string text = ReceiveText;
+        if (string.IsNullOrWhiteSpace(query) || text.Length == 0)
+        {
+            _searchStatus.Text = string.Empty;
+            return;
+        }
+
+        int next = text.IndexOf(query, Math.Min(_searchOffset, text.Length), StringComparison.OrdinalIgnoreCase);
+        if (next < 0) next = text.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+        if (next < 0)
+        {
+            _searchStatus.Text = I18n.T("SearchNoResults");
+            return;
+        }
+
+        _followTail.IsChecked = false;
+        _output.CaretIndex = next + query.Length;
+        _output.SelectionStart = next;
+        _output.SelectionEnd = next + query.Length;
+        _searchOffset = next + query.Length;
+        _searchStatus.Text = I18n.T("SearchFound");
+    }
+
     private Control BuildView()
     {
         var mainGrid = new Grid
@@ -187,7 +239,7 @@ public sealed class MonitorView
         // 1. Receive Monitor Card
         var receiveGrid = new Grid
         {
-            RowDefinitions = new RowDefinitions("Auto,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*"),
             RowSpacing = 9
         };
 
@@ -220,6 +272,7 @@ public sealed class MonitorView
         };
         receiveActions.Children.Add(_followTail);
         receiveActions.Children.Add(_showHex);
+        receiveActions.Children.Add(_timeline);
         _clearReceiveBtn = MacTheme.CreateSecondaryButton(I18n.T("ClearReceive"), () => ClearReceiveRequested?.Invoke());
         _exportReceiveBtn = MacTheme.CreateSecondaryButton(I18n.T("Export"), () => ExportReceiveRequested?.Invoke());
         receiveActions.Children.Add(_clearReceiveBtn);
@@ -228,7 +281,21 @@ public sealed class MonitorView
         receiveHeaderGrid.Children.Add(receiveActions);
         receiveGrid.Children.Add(receiveHeaderGrid);
 
-        Grid.SetRow(_output, 1);
+        var searchBar = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"),
+            ColumnSpacing = 8
+        };
+        searchBar.Children.Add(_searchBox);
+        _findNextButton = MacTheme.CreateSecondaryButton(I18n.T("FindNext"), FindNext);
+        Grid.SetColumn(_findNextButton, 1);
+        searchBar.Children.Add(_findNextButton);
+        Grid.SetColumn(_searchStatus, 2);
+        searchBar.Children.Add(_searchStatus);
+        Grid.SetRow(searchBar, 1);
+        receiveGrid.Children.Add(searchBar);
+
+        Grid.SetRow(_output, 2);
         receiveGrid.Children.Add(_output);
 
         _receiveCardBorder = MacTheme.CreateCard(receiveGrid);

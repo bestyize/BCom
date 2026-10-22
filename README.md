@@ -90,6 +90,17 @@ dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:P
 
 Replace `<runtime-id>` with `win-x64`, `osx-arm64`, `osx-x64`, or `linux-x64`. The active application is in `CrossPlatform/`; the legacy WinForms source and form resources remain in the repository as a migration reference and are excluded from the build.
 
+### Serial event timeline and search (in development)
+
+The next development branch adds a switchable **event timeline** to the
+receive pane. Each low-level serial read or completed write is shown with
+local-time millisecond precision, RX/TX direction, port name and hexadecimal
+bytes. Events are **serial API chunks**, not decoded protocol frames.
+The timeline has its own 128 KiB byte budget; the search bar finds the next
+case-insensitive occurrence in the currently displayed window. Neither the
+timeline nor the search includes evicted history. For full captures, use
+`monitor --jsonl` and redirect output to a file.
+
 ## Automated serial integration testing
 
 On Linux, the CI pipeline tests the **published** BCom executable against a
