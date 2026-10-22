@@ -32,6 +32,7 @@ public static class CliHandler
             "monitor" or "read" => MonitorPort(cmdArgs),
             "replay" => ReplayCapture(cmdArgs),
             "verify" => VerifyScript(cmdArgs),
+            "decode" => DecodeCapture(cmdArgs),
             "mcp" => RunMcpServer(cmdArgs),
             _ => HandleUnknownCommand(command)
         };
@@ -58,6 +59,7 @@ COMMANDS:
   monitor <port>              Listen on a serial port and stream received data
   replay <file.bcomcap>       Replay a recorded capture as timestamped JSONL
   verify <port> <script.txt>  Execute bounded send/expect steps against a port
+  decode <file> <mode>        Decode RX capture into frames (lf, length, fixed:N)
   mcp [--allow-write --port P] Run a local MCP stdio server (read-only by default)
   gui                         Launch graphical desktop interface (default)
   help, --help, -h            Show this command reference
@@ -83,6 +85,60 @@ EXAMPLES FOR AI AGENTS:
   bcom send /dev/tty.usbserial-10 ""AT"" --crlf --wait 1000 --json
   bcom send COM3 ""0A FF 12"" --hex --wait 500
   bcom monitor /dev/ttyACM0 --baud 9600 --duration 3000");
+    }
+
+    private static int DecodeCapture(string[] args)
+    {
+        if (args.Length is < 2 or > 3 || (args.Length == 3 && args[2] != "--crc"))
+        {
+            Console.Error.WriteLine("Usage: BCom decode <file.bcomcap> <lf|length|fixed:N> [--crc]");
+            return 2;
+        }
+        try
+        {
+            var mode = args[1].ToLowerInvariant();
+            SerialFrameDecoder decoder;
+            if (mode == "lf") decoder = new SerialFrameDecoder(SerialFramingMode.Newline);
+            else if (mode == "length") decoder = new SerialFrameDecoder(SerialFramingMode.LengthPrefixed);
+            else if (mode.StartsWith("fixed:", StringComparison.Ordinal) &&
+                int.TryParse(mode[6..], out int size))
+                decoder = new SerialFrameDecoder(SerialFramingMode.FixedLength, size);
+            else throw new ArgumentException("Invalid frame mode.");
+            DecodeToConsoleAsync(args[0], decoder, args.Length == 3).GetAwaiter().GetResult();
+            return 0;
+        }
+        catch (Exception e) when (e is ArgumentException or System.IO.IOException
+            or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Console.Error.WriteLine(e.Message);
+            return 1;
+        }
+    }
+
+    private static async System.Threading.Tasks.Task DecodeToConsoleAsync(
+        string file, SerialFrameDecoder decoder, bool checkCrc)
+    {
+        await foreach (var e in SerialCapture.ReplayAsync(file))
+        {
+            if (e.Direction != SerialTraceDirection.Rx) continue;
+            foreach (var frame in decoder.Append(e.Data))
+            {
+                var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+                using (var writer = new Utf8JsonWriter(buffer))
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("timestamp", e.Timestamp);
+                    writer.WriteString("port", e.Port);
+                    writer.WriteNumber("bytes", frame.Length);
+                    writer.WriteString("hex", SerialDataConverter.ToHexString(frame));
+                    if (checkCrc) writer.WriteBoolean("modbus_crc_ok",
+                        SerialFrameDecoder.CheckModbusCrc(frame));
+                    writer.WriteEndObject();
+                    writer.Flush();
+                }
+                Console.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+            }
+        }
     }
 
     private static int RunMcpServer(string[] args)
