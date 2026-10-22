@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -18,9 +19,12 @@ namespace BCom.CrossPlatform;
 /// </summary>
 public sealed class MainWindow : Window
 {
-    private readonly SerialService _serial = new();
-    private readonly BoundedReceiveBuffer _receivedBuffer = new();
-    private readonly SerialTraceHistory _traceHistory = new();
+    private readonly SerialService _portScanner = new();
+    private readonly SerialSessionManager _sessions = new();
+    private readonly ComboBox _sessionPicker = new() { MinWidth = 195, MaxWidth = 310 };
+    private readonly Button _newSessionButton = new() { MinHeight = 30 };
+    private bool _updatingPicker;
+    private SerialSession? _displayedSession;
     private readonly DispatcherTimer _receiveRenderTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
     private bool _receiveDirty;
     private readonly TopNavBar _topNav = new();
@@ -35,8 +39,6 @@ public sealed class MainWindow : Window
     };
 
     private Border? _bottomBar;
-    private long _sentBytes;
-    private bool _sendBusy;
     private string _statusKey = "StatusReady";
     private object[] _statusArguments = Array.Empty<object>();
     private bool _compact;
@@ -54,8 +56,13 @@ public sealed class MainWindow : Window
         WireEvents();
 
         _receiveRenderTimer.Tick += (_, _) => { if (_receiveDirty) RenderReceived(); };
-        Opened += (_, _) => { _receiveRenderTimer.Start(); _serial.StartPortScanning(); };
-        Closed += (_, _) => { _receiveRenderTimer.Stop(); _serial.Dispose(); };
+        Opened += (_, _) => { _receiveRenderTimer.Start(); _portScanner.StartPortScanning(); };
+        Closed += (_, _) =>
+        {
+            _receiveRenderTimer.Stop();
+            _sessions.Dispose();
+            _portScanner.Dispose();
+        };
 
         if (Application.Current != null)
         {
@@ -91,7 +98,34 @@ public sealed class MainWindow : Window
             ColumnSpacing = 14,
             Margin = new Thickness(14, 12, 14, 12)
         };
-        mainGrid.Children.Add(_monitor.Control);
+        var sessionHeader = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,*"),
+            ColumnSpacing = 8,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var sessionLabel = new TextBlock
+        {
+            Text = I18n.T("Sessions"),
+            VerticalAlignment = VerticalAlignment.Center,
+            FontWeight = Avalonia.Media.FontWeight.SemiBold,
+            Foreground = MacTheme.TextSecondary
+        };
+        sessionHeader.Children.Add(sessionLabel);
+        Grid.SetColumn(_sessionPicker, 1);
+        sessionHeader.Children.Add(_sessionPicker);
+        _newSessionButton.Content = I18n.T("NewConnection");
+        Grid.SetColumn(_newSessionButton, 2);
+        sessionHeader.Children.Add(_newSessionButton);
+        var monitorLayout = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,*"),
+            RowSpacing = 10
+        };
+        monitorLayout.Children.Add(sessionHeader);
+        Grid.SetRow(_monitor.Control, 1);
+        monitorLayout.Children.Add(_monitor.Control);
+        mainGrid.Children.Add(monitorLayout);
         Grid.SetColumn(_settings.Container, 1);
         mainGrid.Children.Add(_settings.Container);
 
@@ -129,8 +163,21 @@ public sealed class MainWindow : Window
         _topNav.LanguageChanged += OnLanguageChanged;
         _topNav.ThemeChanged += OnThemeChanged;
 
+        _sessions.ActiveChanged += ShowSession;
+        _sessions.SessionsChanged += RefreshSessionPicker;
+        _sessionPicker.SelectionChanged += (_, _) =>
+        {
+            if (!_updatingPicker)
+                _sessions.Select(_sessionPicker.SelectedItem as SerialSession);
+        };
+        _newSessionButton.Click += (_, _) => _sessions.Select(null);
+
         // Monitor View Events
         _monitor.SendRequested += HandleSendData;
+        _monitor.ComposerChanged += () =>
+        {
+            if (_displayedSession != null) _monitor.CaptureSession(_displayedSession);
+        };
         _monitor.ClearSendRequested += () => _monitor.SendText = string.Empty;
         _monitor.ClearReceiveRequested += HandleClearReceived;
         _monitor.ImportFileRequested += () => _ = OpenTextFileAsync();
@@ -140,15 +187,24 @@ public sealed class MainWindow : Window
 
         // Settings Panel Events
         _settings.TogglePortRequested += HandleTogglePort;
-        _settings.RefreshPortsRequested += () => _serial.CheckPorts();
-        _settings.SignalsChanged += (rts, dtr) => _serial.SetSignals(rts, dtr);
+        _settings.RefreshPortsRequested += () => _portScanner.CheckPorts();
+        _settings.PortSelectionChanged += RefreshConnectionControls;
+        _settings.SignalsChanged += (rts, dtr) =>
+        {
+            var session = _sessions.Find(_settings.SelectedPort ?? "");
+            if (session?.IsOpen == true && ReferenceEquals(session, _sessions.Active))
+                session.SetSignals(rts, dtr);
+        };
         _settings.PeriodicChanged += HandlePeriodicChanged;
 
-        // Serial Service Events
-        _serial.DataReceived += HandleDataReceived;
-        _serial.ConnectionChanged += HandleConnectionChanged;
-        _serial.ErrorOccurred += msg => SetStatusRaw(msg);
-        _serial.PortsScanned += ports => _settings.SetAvailablePorts(ports);
+        _portScanner.ErrorOccurred += SetStatusRaw;
+        _portScanner.PortsScanned += ports =>
+        {
+            _settings.SetAvailablePorts(ports);
+            foreach (var session in _sessions.Sessions.ToArray())
+                session.Service.CheckPorts();
+            RefreshConnectionControls();
+        };
     }
 
     private void ApplyTheme()
@@ -166,6 +222,8 @@ public sealed class MainWindow : Window
         _topNav.ApplyTheme();
         _monitor.ApplyTheme();
         _settings.ApplyTheme();
+        _newSessionButton.Background = MacTheme.BgSubtle;
+        _newSessionButton.Foreground = MacTheme.TextSecondary;
     }
 
     private void OnThemeChanged(string theme)
@@ -185,14 +243,6 @@ public sealed class MainWindow : Window
 
     private void HandleTogglePort()
     {
-        if (_serial.IsOpen)
-        {
-            _serial.Close();
-            _settings.ResetPeriodic();
-            SetStatus("StatusClosed");
-            return;
-        }
-
         SerialConfig config;
         try
         {
@@ -204,10 +254,24 @@ public sealed class MainWindow : Window
             return;
         }
 
-        if (_serial.Open(config, out var error))
+        var existing = _sessions.Find(config.PortName);
+        if (existing?.IsOpen == true)
         {
+            _sessions.Remove(existing);
+            SetStatus("StatusClosed");
+            RefreshConnectionControls();
+            return;
+        }
+
+        if (_sessions.TryOpen(config, out var session, out var error) && session != null)
+        {
+            session.Changed += OnSessionChanged;
+            session.ConnectionChanged += OnSessionConnectionChanged;
+            session.ErrorOccurred += OnSessionError;
             SerialProfileStore.Save(config);
             SetStatus("StatusOpen", config.PortName);
+            RefreshSessionPicker();
+            RefreshConnectionControls();
         }
         else if (error != null)
         {
@@ -215,95 +279,109 @@ public sealed class MainWindow : Window
         }
     }
 
-    private void HandleConnectionChanged(bool isOpen, string portName)
+    private void OnSessionChanged(SerialSession session)
     {
-        _topNav.SetConnectionStatus(isOpen, portName);
-        _settings.SetConnectionState(isOpen);
-        if (!isOpen) _settings.ResetPeriodic();
+        if (ReferenceEquals(session, _sessions.Active))
+            _receiveDirty = true;
     }
 
-    private void HandleDataReceived(byte[] data)
+    private void OnSessionConnectionChanged(SerialSession session, bool connected)
     {
-        _receivedBuffer.Append(data);
-        _traceHistory.Append(DateTimeOffset.UtcNow, _serial.CurrentPortName,
-            SerialTraceDirection.Rx, data);
-        _receiveDirty = true;
+        if (ReferenceEquals(session, _sessions.Active))
+        {
+            _topNav.SetConnectionStatus(connected, session.Config.PortName);
+            _settings.SetConnectionState(connected);
+        }
+        RefreshSessionPicker();
+        RefreshConnectionControls();
+    }
+
+    private void OnSessionError(SerialSession session, string error)
+    {
+        if (ReferenceEquals(session, _sessions.Active))
+            SetStatusRaw(error);
+    }
+
+    private void ShowSession(SerialSession? session)
+    {
+        if (_displayedSession != null)
+            _monitor.CaptureSession(_displayedSession);
+
+        _displayedSession = session;
+        _monitor.ApplySession(session);
+        if (session != null)
+            _settings.ApplySession(session.Config, session.RepeatEnabled, session.RepeatIntervalMs);
+        else
+            _settings.ResetPeriodic();
+
+        _topNav.SetConnectionStatus(session?.IsOpen == true, session?.Config.PortName ?? "");
+        RefreshSessionPicker();
+        RefreshConnectionControls();
+        RenderReceived();
+    }
+
+    private void RefreshSessionPicker()
+    {
+        _updatingPicker = true;
+        try
+        {
+            _sessionPicker.ItemsSource = _sessions.Sessions.ToArray();
+            _sessionPicker.SelectedItem = _sessions.Active;
+        }
+        finally { _updatingPicker = false; }
+    }
+
+    private void RefreshConnectionControls()
+    {
+        var connected = _sessions.Find(_settings.SelectedPort ?? "")?.IsOpen == true;
+        _settings.SetConnectionState(connected);
     }
 
     private void RenderReceived()
     {
         _receiveDirty = false;
-        var bytes = _receivedBuffer.Snapshot();
-        _monitor.ReceiveText = _monitor.IsTimelineView
-            ? SerialTraceFormatter.Format(_traceHistory)
-            : _monitor.IsShowHex
-                ? SerialDataConverter.ToHexString(bytes)
-                : SerialDataConverter.ToUtf8String(bytes);
+        var session = _sessions.Active;
+        var bytes = session?.Received.Snapshot() ?? Array.Empty<byte>();
+        _monitor.ReceiveText = session == null
+            ? string.Empty
+            : _monitor.IsTimelineView
+                ? SerialTraceFormatter.Format(session.Trace)
+                : _monitor.IsShowHex
+                    ? SerialDataConverter.ToHexString(bytes)
+                    : SerialDataConverter.ToUtf8String(bytes);
         UpdateCounts();
     }
 
     private async void HandleSendData()
     {
-        // A slow device must not accumulate an unbounded queue of timer sends.
-        if (_sendBusy) return;
-        if (!_serial.IsOpen)
+        var session = _sessions.Active;
+        if (session?.IsOpen != true)
         {
             _ = MacDialog.ShowAlertAsync(this, I18n.T("ErrorNotOpen"));
-            _settings.ResetPeriodic();
             return;
         }
 
-        if (!SerialDataConverter.PreparePayload(
-                _monitor.SendText,
-                _monitor.IsSendHex,
-                _monitor.IsNewLine,
-                out var payload,
-                out var prepError))
-        {
-            _ = MacDialog.ShowAlertAsync(this, prepError ?? I18n.T("ErrorHex"));
-            return;
-        }
-
-        _sendBusy = true;
-        try
-        {
-            var (success, writeError) = await _serial.WriteAsync(payload);
-            if (success)
-            {
-                _sentBytes += payload.Length;
-                _traceHistory.Append(DateTimeOffset.UtcNow, _serial.CurrentPortName,
-                    SerialTraceDirection.Tx, payload);
-                if (_monitor.IsTimelineView) _receiveDirty = true;
-                UpdateCounts();
-            }
-            else if (writeError != null && _serial.IsOpen)
-            {
-                _ = MacDialog.ShowAlertAsync(this, writeError);
-            }
-        }
-        finally
-        {
-            _sendBusy = false;
-        }
+        _monitor.CaptureSession(session);
+        var (success, error) = await session.SendAsync();
+        if (!success && error != null && ReferenceEquals(session, _sessions.Active))
+            _ = MacDialog.ShowAlertAsync(this, error);
+        if (success && ReferenceEquals(session, _sessions.Active))
+            UpdateCounts();
     }
 
     private void HandleClearReceived()
     {
-        _receivedBuffer.Clear();
-        _traceHistory.Clear();
+        _sessions.Active?.ClearReceived();
         RenderReceived();
     }
 
     private void HandlePeriodicChanged(bool enabled, int intervalMs)
     {
-        if (enabled && intervalMs > 0)
-        {
-            _serial.StartPeriodicSend(intervalMs, HandleSendData);
-        }
-        else
-        {
-            _serial.StopPeriodicSend();
-        }
+        var session = _sessions.Active;
+        if (session == null || !ReferenceEquals(session, _sessions.Find(_settings.SelectedPort ?? "")))
+            return;
+        _monitor.CaptureSession(session);
+        session.ConfigureRepeat(enabled, intervalMs);
     }
 
     private void ToggleCompactMode()
@@ -325,7 +403,9 @@ public sealed class MainWindow : Window
         _topNav.RefreshLanguage();
         _monitor.RefreshLanguage();
         _settings.RefreshLanguage();
-        _topNav.SetConnectionStatus(_serial.IsOpen, _serial.CurrentPortName);
+        _newSessionButton.Content = I18n.T("NewConnection");
+        _topNav.SetConnectionStatus(_sessions.Active?.IsOpen == true,
+            _sessions.Active?.Config.PortName ?? "");
         _statusText.Text = I18n.Format(_statusKey, _statusArguments);
     }
 
@@ -343,7 +423,9 @@ public sealed class MainWindow : Window
 
     private void UpdateCounts()
     {
-        _monitor.UpdateCounts(_receivedBuffer.TotalBytes, _sentBytes, _receivedBuffer.Count);
+        var session = _sessions.Active;
+        _monitor.UpdateCounts(session?.Received.TotalBytes ?? 0,
+            session?.SentBytes ?? 0, session?.Received.Count ?? 0);
     }
 
     private void HandleUtilityLaunch(string kind)
