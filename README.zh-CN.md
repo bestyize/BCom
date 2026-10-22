@@ -128,6 +128,9 @@ BCom verify COM3 commands.txt --baud 115200 --wait 1500
 BCom decode session.bcomcap lf
 BCom decode session.bcomcap fixed:8 --crc
 BCom decode session.bcomcap length
+BCom template at "AT+GMR"
+BCom template modbus-read 1 0 10
+BCom template nmea-check '$ABC*40'
 ```
 
 测试失败即停止；每步最多 4 KiB、全程最多 256 步，单步等待最多 30 秒，
@@ -138,7 +141,7 @@ BCom decode session.bcomcap length
 并限定端口，例如 `BCom mcp --allow-write --port COM3`。
 单次请求最多发送 4096 字节，写入命令固定使用 115200 波特率并限制超时，
 每次单独打开设备，不复用已打开的 GUI 会话。只应让可信任的 MCP 客户端
-访问该进程；当前没有细粒度的用户授权弹窗，也不支持任意 shell 命令。
+访问该进程；操作审计信息写入标准错误输出（只包含时间、工具名、端口和结果，不记录数据内容）。当前没有细粒度的用户授权弹窗，也不支持任意 shell 命令。
 
 ### 原始数据录制与回放（阶段 A）
 
