@@ -56,6 +56,21 @@ public sealed class SerialSessionTests
     }
 
     [Fact]
+    public void ManagerRejectsUnknownSessionAndBlankPortWithoutOpeningHardware()
+    {
+        using var manager = new SerialSessionManager();
+        using var unknown = new SerialSession(Config("COM42"));
+
+        Assert.False(manager.Select(unknown));
+        Assert.False(manager.Remove(unknown));
+        Assert.False(manager.TryOpen(Config(""), out var result, out var error));
+        Assert.Null(result);
+        Assert.NotNull(error);
+        Assert.Empty(manager.Sessions);
+        Assert.Null(manager.Active);
+    }
+
+    [Fact]
     public void DisposedSessionRejectsOpenAndSend()
     {
         var session = new SerialSession(Config("COM1"));
