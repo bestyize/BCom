@@ -126,7 +126,7 @@ EXAMPLES FOR AI AGENTS:
         }
 
         var portName = args[0];
-        var baud = GetIntOption(args, "--baud", 115200);
+        if (!TryGetIntOption(args, "--baud", 115200, 1, 10000000, out var baud)) return 2;
 
         try
         {
@@ -152,8 +152,8 @@ EXAMPLES FOR AI AGENTS:
 
         var portName = args[0];
         var inputData = args[1];
-        var baud = GetIntOption(args, "--baud", 115200);
-        var waitMs = GetIntOption(args, "--wait", 1000);
+        if (!TryGetIntOption(args, "--baud", 115200, 1, 10000000, out var baud)) return 2;
+        if (!TryGetIntOption(args, "--wait", 1000, 0, 600000, out var waitMs)) return 2;
         var isHex = args.Any(a => a.Equals("--hex", StringComparison.OrdinalIgnoreCase));
         var crlf = args.Any(a => a.Equals("--crlf", StringComparison.OrdinalIgnoreCase));
         var rts = args.Any(a => a.Equals("--rts", StringComparison.OrdinalIgnoreCase));
@@ -242,10 +242,17 @@ EXAMPLES FOR AI AGENTS:
         }
 
         var portName = args[0];
-        var baud = GetIntOption(args, "--baud", 115200);
-        var duration = GetIntOption(args, "--duration", 5000);
+        if (!TryGetIntOption(args, "--baud", 115200, 1, 10000000, out var baud)) return 2;
+        if (!TryGetIntOption(args, "--duration", 5000, 0, 3600000, out var duration)) return 2;
         var isHex = args.Any(a => a.Equals("--hex", StringComparison.OrdinalIgnoreCase));
         var asJson = args.Any(a => a.Equals("--json", StringComparison.OrdinalIgnoreCase));
+
+        // JSON aggregation of an indefinite stream has no bounded result.
+        if (asJson && duration == 0)
+        {
+            Console.Error.WriteLine("Use a finite --duration with --json; indefinite capture must be streamed.");
+            return 2;
+        }
 
         var collected = new List<byte>();
 
@@ -307,16 +314,23 @@ EXAMPLES FOR AI AGENTS:
         }
     }
 
-    private static int GetIntOption(string[] args, string flag, int defaultValue)
+    private static bool TryGetIntOption(
+        string[] args, string flag, int defaultValue, int min, int max, out int value)
     {
-        for (int i = 0; i < args.Length - 1; i++)
+        value = defaultValue;
+        for (int i = 0; i < args.Length; i++)
         {
-            if (args[i].Equals(flag, StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var val))
+            if (!args[i].Equals(flag, StringComparison.OrdinalIgnoreCase)) continue;
+            if (i + 1 >= args.Length ||
+                !int.TryParse(args[i + 1], out var parsed) ||
+                parsed < min || parsed > max)
             {
-                return val;
+                Console.Error.WriteLine($"Invalid {flag}: expected an integer between {min} and {max}.");
+                return false;
             }
+            value = parsed;
         }
-        return defaultValue;
+        return true;
     }
 
     private static string EscapeJson(string? s)
