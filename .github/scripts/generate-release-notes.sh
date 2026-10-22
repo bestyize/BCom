@@ -10,6 +10,10 @@ if [[ -f dist/SHA256SUMS.txt ]]; then
 fi
 
 mkdir -p dist
+release_highlights=""
+if [[ -f ".github/release-notes/${tag}.md" ]]; then
+  release_highlights="$(cat ".github/release-notes/${tag}.md")"
+fi
 mac_rows=""
 if [[ "${MACOS_NOTARIZED:-false}" == "true" ]]; then
   mac_rows="| **macOS (Apple Silicon)** | \`BCom-${tag}-osx-arm64.dmg\` | Notarized DMG |"
@@ -22,6 +26,8 @@ fi
 
 cat > dist/RELEASE_NOTES.md <<EOF
 ## BCom ${tag}
+
+${release_highlights}
 
 Cross-platform serial communication and debugging assistant built with **.NET 10 LTS and Avalonia UI 12**, supporting **Windows, macOS, and Linux**.
 
