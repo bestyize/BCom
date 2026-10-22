@@ -191,7 +191,17 @@ public sealed class MainWindow : Window
             return;
         }
 
-        var config = _settings.GetConfig();
+        SerialConfig config;
+        try
+        {
+            config = _settings.GetConfig();
+        }
+        catch (ArgumentException ex)
+        {
+            _ = MacDialog.ShowAlertAsync(this, ex.Message);
+            return;
+        }
+
         if (_serial.Open(config, out var error))
         {
             SetStatus("StatusOpen", config.PortName);
