@@ -132,6 +132,13 @@ jobs:
             exit 1
           fi
 
+      - name: Verify CLI serial I/O via Linux pseudo-terminals
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Tests/serial_pty_integration.py --binary ./publish/BCom
+
       - name: Package and verify Windows ZIP
         if: runner.os == 'Windows'
         shell: pwsh
