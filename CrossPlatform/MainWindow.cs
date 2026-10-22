@@ -20,6 +20,7 @@ public sealed class MainWindow : Window
 {
     private readonly SerialService _serial = new();
     private readonly BoundedReceiveBuffer _receivedBuffer = new();
+    private readonly SerialTraceHistory _traceHistory = new();
     private readonly DispatcherTimer _receiveRenderTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
     private bool _receiveDirty;
     private readonly TopNavBar _topNav = new();
@@ -135,6 +136,7 @@ public sealed class MainWindow : Window
         _monitor.ImportFileRequested += () => _ = OpenTextFileAsync();
         _monitor.ExportReceiveRequested += () => _ = SaveReceivedAsync();
         _monitor.HexDisplayToggled += _ => RenderReceived();
+        _monitor.TimelineDisplayToggled += _ => RenderReceived();
 
         // Settings Panel Events
         _settings.TogglePortRequested += HandleTogglePort;
@@ -223,6 +225,8 @@ public sealed class MainWindow : Window
     private void HandleDataReceived(byte[] data)
     {
         _receivedBuffer.Append(data);
+        _traceHistory.Append(DateTimeOffset.UtcNow, _serial.CurrentPortName,
+            SerialTraceDirection.Rx, data);
         _receiveDirty = true;
     }
 
@@ -230,9 +234,11 @@ public sealed class MainWindow : Window
     {
         _receiveDirty = false;
         var bytes = _receivedBuffer.Snapshot();
-        _monitor.ReceiveText = _monitor.IsShowHex
-            ? SerialDataConverter.ToHexString(bytes)
-            : SerialDataConverter.ToUtf8String(bytes);
+        _monitor.ReceiveText = _monitor.IsTimelineView
+            ? SerialTraceFormatter.Format(_traceHistory)
+            : _monitor.IsShowHex
+                ? SerialDataConverter.ToHexString(bytes)
+                : SerialDataConverter.ToUtf8String(bytes);
         UpdateCounts();
     }
 
@@ -265,6 +271,9 @@ public sealed class MainWindow : Window
             if (success)
             {
                 _sentBytes += payload.Length;
+                _traceHistory.Append(DateTimeOffset.UtcNow, _serial.CurrentPortName,
+                    SerialTraceDirection.Tx, payload);
+                if (_monitor.IsTimelineView) _receiveDirty = true;
                 UpdateCounts();
             }
             else if (writeError != null && _serial.IsOpen)
@@ -281,6 +290,7 @@ public sealed class MainWindow : Window
     private void HandleClearReceived()
     {
         _receivedBuffer.Clear();
+        _traceHistory.Clear();
         RenderReceived();
     }
 
