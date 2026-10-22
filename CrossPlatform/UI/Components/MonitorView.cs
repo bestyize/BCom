@@ -36,6 +36,8 @@ public sealed class MonitorView
         BorderThickness = new Thickness(1)
     };
 
+    private readonly CheckBox _plotToggle = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TelemetryPlotView _plot = new();
     private readonly CheckBox _timeline = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBox _searchBox = new() { MinWidth = 160, FontSize = 12, Height = 30 };
     private readonly TextBlock _searchStatus = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
@@ -74,6 +76,10 @@ public sealed class MonitorView
     public event Action<bool>? TimelineDisplayToggled;
 
     public Control Control { get; }
+
+    public bool IsPlotEnabled => _plotToggle.IsChecked == true;
+    public void UpdatePlot(TelemetryBuffer? telemetry) =>
+        _plot.Update(telemetry?.Snapshot() ?? Array.Empty<double[]>());
 
     public bool IsTimelineView => _timeline.IsChecked == true;
     public bool IsShowHex => _showHex.IsChecked == true;
@@ -170,6 +176,7 @@ public sealed class MonitorView
 
         _followTail.Content = I18n.T("FollowTail");
         _timeline.Content = I18n.T("Timeline");
+        _plotToggle.Content = I18n.T("QuickPlot");
         _searchBox.PlaceholderText = I18n.T("SearchPlaceholder");
         if (_findNextButton != null) _findNextButton.Content = I18n.T("FindNext");
         _showHex.Content = I18n.T("HexDisplay");
@@ -275,7 +282,7 @@ public sealed class MonitorView
         // 1. Receive Monitor Card
         var receiveGrid = new Grid
         {
-            RowDefinitions = new RowDefinitions("Auto,Auto,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"),
             RowSpacing = 9
         };
 
@@ -309,6 +316,7 @@ public sealed class MonitorView
         receiveActions.Children.Add(_followTail);
         receiveActions.Children.Add(_showHex);
         receiveActions.Children.Add(_timeline);
+        receiveActions.Children.Add(_plotToggle);
         _clearReceiveBtn = MacTheme.CreateSecondaryButton(I18n.T("ClearReceive"), () => ClearReceiveRequested?.Invoke());
         _exportReceiveBtn = MacTheme.CreateSecondaryButton(I18n.T("Export"), () => ExportReceiveRequested?.Invoke());
         receiveActions.Children.Add(_clearReceiveBtn);
@@ -333,6 +341,11 @@ public sealed class MonitorView
 
         Grid.SetRow(_output, 2);
         receiveGrid.Children.Add(_output);
+        _plot.Control.IsVisible = false;
+        _plotToggle.IsCheckedChanged += (_, _) =>
+            _plot.Control.IsVisible = IsPlotEnabled;
+        Grid.SetRow(_plot.Control, 3);
+        receiveGrid.Children.Add(_plot.Control);
 
         _receiveCardBorder = MacTheme.CreateCard(receiveGrid);
         mainGrid.Children.Add(_receiveCardBorder);
