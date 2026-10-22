@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO.Ports;
 using System.Linq;
 using System.Threading;
@@ -14,6 +15,13 @@ namespace BCom.CrossPlatform;
 public sealed class SerialService : IDisposable
 {
     private SerialPort? _port;
+    private readonly object _receiveQueueLock = new();
+    private readonly Queue<byte[]> _pendingReceive = new();
+    private int _pendingReceiveBytes;
+    private bool _drainScheduled;
+    private long _droppedDisplayBytes;
+    private const int MaxDisplayQueueBytes = 512 * 1024;
+    public long DroppedDisplayBytes => Interlocked.Read(ref _droppedDisplayBytes);
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly DispatcherTimer _scanTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _periodicTimer = new();
@@ -21,6 +29,8 @@ public sealed class SerialService : IDisposable
     private string[] _lastPorts = Array.Empty<string>();
 
     public event Action<byte[]>? DataReceived;
+    // Invoked on the serial worker before UI dispatch; safe for nonblocking capture.
+    public event Action<DateTimeOffset, byte[]>? RawDataReceived;
     public event Action<bool, string>? ConnectionChanged;
     public event Action<string>? ErrorOccurred;
     public event Action<string[]>? PortsScanned;
@@ -127,6 +137,11 @@ public sealed class SerialService : IDisposable
         StopPeriodicSend();
         var port = _port;
         _port = null;
+        lock (_receiveQueueLock)
+        {
+            _pendingReceive.Clear();
+            _pendingReceiveBytes = 0;
+        }
 
         if (port != null)
         {
@@ -245,6 +260,47 @@ public sealed class SerialService : IDisposable
         _periodicAction = null;
     }
 
+    private void QueueForDisplay(byte[] bytes)
+    {
+        bool schedule = false;
+        lock (_receiveQueueLock)
+        {
+            if (bytes.Length > MaxDisplayQueueBytes ||
+                _pendingReceiveBytes + bytes.Length > MaxDisplayQueueBytes)
+            {
+                Interlocked.Add(ref _droppedDisplayBytes, bytes.Length);
+                return;
+            }
+            _pendingReceive.Enqueue(bytes);
+            _pendingReceiveBytes += bytes.Length;
+            if (!_drainScheduled)
+            {
+                _drainScheduled = true;
+                schedule = true;
+            }
+        }
+        if (schedule) Dispatcher.UIThread.Post(DrainDisplayQueue);
+    }
+
+    private void DrainDisplayQueue()
+    {
+        while (true)
+        {
+            byte[] next;
+            lock (_receiveQueueLock)
+            {
+                if (_pendingReceive.Count == 0)
+                {
+                    _drainScheduled = false;
+                    return;
+                }
+                next = _pendingReceive.Dequeue();
+                _pendingReceiveBytes -= next.Length;
+            }
+            DataReceived?.Invoke(next);
+        }
+    }
+
     private void OnSerialDataReceived(object? sender, SerialDataReceivedEventArgs e)
     {
         try
@@ -262,7 +318,9 @@ public sealed class SerialService : IDisposable
                 Array.Resize(ref buffer, read);
             }
 
-            Dispatcher.UIThread.Post(() => DataReceived?.Invoke(buffer));
+            if (!ReferenceEquals(port, _port)) return;
+            RawDataReceived?.Invoke(DateTimeOffset.UtcNow, buffer);
+            QueueForDisplay(buffer);
         }
         catch (Exception ex)
         {
