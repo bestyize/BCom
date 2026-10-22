@@ -70,6 +70,7 @@ OPTIONS FOR 'monitor':
   --duration <ms>             Listen duration in milliseconds (default: 5000, 0 = indefinite)
   --hex                       Display captured data in hexadecimal format
   --json                      Output captured buffer as JSON
+  --jsonl                     Emit timestamped newline-delimited JSON events
 
 EXAMPLES FOR AI AGENTS:
   bcom ports --json
@@ -246,6 +247,12 @@ EXAMPLES FOR AI AGENTS:
         if (!TryGetIntOption(args, "--duration", 5000, 0, 3600000, out var duration)) return 2;
         var isHex = args.Any(a => a.Equals("--hex", StringComparison.OrdinalIgnoreCase));
         var asJson = args.Any(a => a.Equals("--json", StringComparison.OrdinalIgnoreCase));
+        var asJsonLines = args.Any(a => a.Equals("--jsonl", StringComparison.OrdinalIgnoreCase));
+        if (asJson && asJsonLines)
+        {
+            Console.Error.WriteLine("Choose either --json or --jsonl.");
+            return 2;
+        }
 
         // JSON aggregation of an indefinite stream has no bounded result.
         if (asJson && duration == 0)
@@ -264,7 +271,7 @@ EXAMPLES FOR AI AGENTS:
             };
 
             port.Open();
-            if (!asJson)
+            if (!asJson && !asJsonLines)
             {
                 Console.WriteLine($"Monitoring {portName} at {baud} baud (duration: {(duration > 0 ? $"{duration}ms" : "indefinite, press Ctrl+C to stop")})...");
             }
@@ -279,9 +286,17 @@ EXAMPLES FOR AI AGENTS:
                     int read = port.Read(buffer, 0, Math.Min(buffer.Length, port.BytesToRead));
                     if (read > 0)
                     {
-                        for (int i = 0; i < read; i++) collected.Add(buffer[i]);
+                        if (asJson)
+                            for (int i = 0; i < read; i++) collected.Add(buffer[i]);
 
-                        if (!asJson)
+                        if (asJsonLines)
+                        {
+                            var chunk = buffer.Take(read).ToArray();
+                            string timestamp = DateTimeOffset.UtcNow.ToString("O");
+                            Console.WriteLine($"{{\"event\":\"data\",\"timestamp\":\"{timestamp}\",\"port\":\"{EscapeJson(portName)}\",\"bytes\":{read},\"hex\":\"{SerialDataConverter.ToHexString(chunk)}\"}}");
+                            Console.Out.Flush();
+                        }
+                        else if (!asJson)
                         {
                             var chunk = buffer.Take(read).ToArray();
                             Console.Write(isHex ? SerialDataConverter.ToHexString(chunk) + " " : SerialDataConverter.ToUtf8String(chunk));
@@ -294,7 +309,7 @@ EXAMPLES FOR AI AGENTS:
                 }
             }
 
-            if (!asJson && isHex) Console.WriteLine();
+            if (!asJson && !asJsonLines && isHex) Console.WriteLine();
 
             if (asJson)
             {
@@ -306,8 +321,8 @@ EXAMPLES FOR AI AGENTS:
         }
         catch (Exception ex)
         {
-            if (asJson)
-                Console.WriteLine($"{{\"error\":\"{EscapeJson(ex.Message)}\"}}");
+            if (asJson || asJsonLines)
+                Console.WriteLine($"{{\"event\":\"error\",\"error\":\"{EscapeJson(ex.Message)}\"}}");
             else
                 Console.Error.WriteLine($"Monitor Error: {ex.Message}");
             return 1;
