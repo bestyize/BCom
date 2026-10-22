@@ -8,6 +8,7 @@ using Avalonia.Layout;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
+using Avalonia.Threading;
 
 namespace BCom.CrossPlatform;
 
@@ -18,7 +19,9 @@ namespace BCom.CrossPlatform;
 public sealed class MainWindow : Window
 {
     private readonly SerialService _serial = new();
-    private readonly List<byte> _receivedBuffer = new();
+    private readonly BoundedReceiveBuffer _receivedBuffer = new();
+    private readonly DispatcherTimer _receiveRenderTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
+    private bool _receiveDirty;
     private readonly TopNavBar _topNav = new();
     private readonly MonitorView _monitor = new();
     private readonly SettingsPanel _settings = new();
@@ -31,7 +34,7 @@ public sealed class MainWindow : Window
     };
 
     private Border? _bottomBar;
-    private int _sentBytes;
+    private long _sentBytes;
     private string _statusKey = "StatusReady";
     private object[] _statusArguments = Array.Empty<object>();
     private bool _compact;
@@ -48,8 +51,9 @@ public sealed class MainWindow : Window
         Content = BuildLayout();
         WireEvents();
 
-        Opened += (_, _) => _serial.StartPortScanning();
-        Closed += (_, _) => _serial.Dispose();
+        _receiveRenderTimer.Tick += (_, _) => { if (_receiveDirty) RenderReceived(); };
+        Opened += (_, _) => { _receiveRenderTimer.Start(); _serial.StartPortScanning(); };
+        Closed += (_, _) => { _receiveRenderTimer.Stop(); _serial.Dispose(); };
 
         if (Application.Current != null)
         {
@@ -205,16 +209,14 @@ public sealed class MainWindow : Window
 
     private void HandleDataReceived(byte[] data)
     {
-        for (int i = 0; i < data.Length; i++)
-        {
-            _receivedBuffer.Add(data[i]);
-        }
-        RenderReceived();
+        _receivedBuffer.Append(data);
+        _receiveDirty = true;
     }
 
     private void RenderReceived()
     {
-        var bytes = _receivedBuffer.ToArray();
+        _receiveDirty = false;
+        var bytes = _receivedBuffer.Snapshot();
         _monitor.ReceiveText = _monitor.IsShowHex
             ? SerialDataConverter.ToHexString(bytes)
             : SerialDataConverter.ToUtf8String(bytes);
@@ -307,7 +309,7 @@ public sealed class MainWindow : Window
 
     private void UpdateCounts()
     {
-        _monitor.UpdateCounts(_receivedBuffer.Count, _sentBytes);
+        _monitor.UpdateCounts(_receivedBuffer.TotalBytes, _sentBytes);
     }
 
     private void HandleUtilityLaunch(string kind)
