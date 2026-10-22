@@ -125,6 +125,9 @@ HEX:01 03 00 00 00 0A C5 CD => HEX:01 03
 
 ```bash
 BCom verify COM3 commands.txt --baud 115200 --wait 1500
+BCom decode session.bcomcap lf
+BCom decode session.bcomcap fixed:8 --crc
+BCom decode session.bcomcap length
 ```
 
 测试失败即停止；每步最多 4 KiB、全程最多 256 步，单步等待最多 30 秒，
