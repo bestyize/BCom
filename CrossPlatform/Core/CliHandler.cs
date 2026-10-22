@@ -31,6 +31,7 @@ public static class CliHandler
             "send" => SendData(cmdArgs),
             "monitor" or "read" => MonitorPort(cmdArgs),
             "replay" => ReplayCapture(cmdArgs),
+            "verify" => VerifyScript(cmdArgs),
             _ => HandleUnknownCommand(command)
         };
     }
@@ -55,6 +56,7 @@ COMMANDS:
   send <port> <data>          Send ASCII or HEX payload and optionally read reply
   monitor <port>              Listen on a serial port and stream received data
   replay <file.bcomcap>       Replay a recorded capture as timestamped JSONL
+  verify <port> <script.txt>  Execute bounded send/expect steps against a port
   gui                         Launch graphical desktop interface (default)
   help, --help, -h            Show this command reference
 
@@ -79,6 +81,38 @@ EXAMPLES FOR AI AGENTS:
   bcom send /dev/tty.usbserial-10 ""AT"" --crlf --wait 1000 --json
   bcom send COM3 ""0A FF 12"" --hex --wait 500
   bcom monitor /dev/ttyACM0 --baud 9600 --duration 3000");
+    }
+
+    private static int VerifyScript(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.Error.WriteLine("Usage: bcom verify <port> <script.txt> [--baud rate] [--wait ms]");
+            return 2;
+        }
+        int baud = 115200, wait = 1000;
+        for (int i = 2; i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || !int.TryParse(args[i + 1], out int value))
+                return 2;
+            if (args[i] == "--baud") baud = value;
+            else if (args[i] == "--wait") wait = value;
+            else return 2;
+        }
+        try
+        {
+            var steps = SerialAutomation.Parse(System.IO.File.ReadAllText(args[1]));
+            var results = SerialAutomation.Execute(args[0], baud, steps, wait);
+            foreach (var result in results)
+                Console.WriteLine($"Step {result.Step}: {(result.Passed ? "PASS" : "FAIL")} ({result.Detail}, {result.ReceivedBytes} bytes)");
+            return results.Count == steps.Count && results.All(x => x.Passed) ? 0 : 1;
+        }
+        catch (Exception e) when (e is FormatException or System.IO.IOException
+            or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            Console.Error.WriteLine(e.Message);
+            return 1;
+        }
     }
 
     private static int ReplayCapture(string[] args)
