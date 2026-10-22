@@ -66,6 +66,13 @@ public sealed class SerialService : IDisposable
             _lastPorts = current;
             PortsScanned?.Invoke(current);
         }
+
+        // SerialPort.IsOpen may stay true after a USB serial adapter is removed.
+        if (IsOpen && !current.Contains(CurrentPortName, StringComparer.OrdinalIgnoreCase))
+        {
+            Close();
+            ErrorOccurred?.Invoke(I18n.T("ErrorDisconnected"));
+        }
     }
 
     public bool Open(SerialConfig config, out string? errorMessage)
