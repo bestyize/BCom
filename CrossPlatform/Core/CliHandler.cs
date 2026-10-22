@@ -30,6 +30,11 @@ public static class CliHandler
             "ping" => PingPort(cmdArgs),
             "send" => SendData(cmdArgs),
             "monitor" or "read" => MonitorPort(cmdArgs),
+            "replay" => ReplayCapture(cmdArgs),
+            "verify" => VerifyScript(cmdArgs),
+            "decode" => DecodeCapture(cmdArgs),
+            "template" => PrintProtocolTemplate(cmdArgs),
+            "mcp" => RunMcpServer(cmdArgs),
             _ => HandleUnknownCommand(command)
         };
     }
@@ -53,6 +58,11 @@ COMMANDS:
   ping <port>                 Verify that a serial port can be opened
   send <port> <data>          Send ASCII or HEX payload and optionally read reply
   monitor <port>              Listen on a serial port and stream received data
+  replay <file.bcomcap>       Replay a recorded capture as timestamped JSONL
+  verify <port> <script.txt>  Execute bounded send/expect steps against a port
+  decode <file> <mode>        Decode RX capture into frames (lf, length, fixed:N)
+  template <protocol>         Generate safe AT/Modbus frames or verify NMEA checksums
+  mcp [--allow-write --port P] Run a local MCP stdio server (read-only by default)
   gui                         Launch graphical desktop interface (default)
   help, --help, -h            Show this command reference
 
@@ -77,6 +87,194 @@ EXAMPLES FOR AI AGENTS:
   bcom send /dev/tty.usbserial-10 ""AT"" --crlf --wait 1000 --json
   bcom send COM3 ""0A FF 12"" --hex --wait 500
   bcom monitor /dev/ttyACM0 --baud 9600 --duration 3000");
+    }
+
+    private static int PrintProtocolTemplate(string[] args)
+    {
+        try
+        {
+            byte[] bytes;
+            if (args.Length is >= 1 and <= 2 && args[0] == "at")
+                bytes = SerialProtocolTemplates.AtCommand(args.Length == 2 ? args[1] : "AT");
+            else if (args.Length == 4 && args[0] == "modbus-read" &&
+                byte.TryParse(args[1], out var slave) &&
+                ushort.TryParse(args[2], out var first) &&
+                ushort.TryParse(args[3], out var count))
+                bytes = SerialProtocolTemplates.ModbusReadHoldingRegisters(slave, first, count);
+            else if (args.Length == 2 && args[0] == "nmea-check")
+            {
+                bool valid = SerialProtocolTemplates.ValidateNmeaChecksum(args[1]);
+                Console.WriteLine(valid ? "valid checksum" : "invalid checksum");
+                return valid ? 0 : 1;
+            }
+            else
+            {
+                Console.Error.WriteLine("Usage: BCom template at [command] | modbus-read <slave> <register> <count> | nmea-check <sentence>");
+                return 2;
+            }
+            Console.WriteLine(SerialDataConverter.ToHexString(bytes));
+            return 0;
+        }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            return 2;
+        }
+    }
+
+    private static int DecodeCapture(string[] args)
+    {
+        if (args.Length is < 2 or > 3 || (args.Length == 3 && args[2] != "--crc"))
+        {
+            Console.Error.WriteLine("Usage: BCom decode <file.bcomcap> <lf|length|fixed:N> [--crc]");
+            return 2;
+        }
+        try
+        {
+            var mode = args[1].ToLowerInvariant();
+            SerialFrameDecoder decoder;
+            if (mode == "lf") decoder = new SerialFrameDecoder(SerialFramingMode.Newline);
+            else if (mode == "length") decoder = new SerialFrameDecoder(SerialFramingMode.LengthPrefixed);
+            else if (mode.StartsWith("fixed:", StringComparison.Ordinal) &&
+                int.TryParse(mode[6..], out int size))
+                decoder = new SerialFrameDecoder(SerialFramingMode.FixedLength, size);
+            else throw new ArgumentException("Invalid frame mode.");
+            DecodeToConsoleAsync(args[0], decoder, args.Length == 3).GetAwaiter().GetResult();
+            return 0;
+        }
+        catch (Exception e) when (e is ArgumentException or System.IO.IOException
+            or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Console.Error.WriteLine(e.Message);
+            return 1;
+        }
+    }
+
+    private static async System.Threading.Tasks.Task DecodeToConsoleAsync(
+        string file, SerialFrameDecoder decoder, bool checkCrc)
+    {
+        await foreach (var e in SerialCapture.ReplayAsync(file))
+        {
+            if (e.Direction != SerialTraceDirection.Rx) continue;
+            foreach (var frame in decoder.Append(e.Data))
+            {
+                var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+                using (var writer = new Utf8JsonWriter(buffer))
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("timestamp", e.Timestamp);
+                    writer.WriteString("port", e.Port);
+                    writer.WriteNumber("bytes", frame.Length);
+                    writer.WriteString("hex", SerialDataConverter.ToHexString(frame));
+                    if (checkCrc) writer.WriteBoolean("modbus_crc_ok",
+                        SerialFrameDecoder.CheckModbusCrc(frame));
+                    writer.WriteEndObject();
+                    writer.Flush();
+                }
+                Console.WriteLine(Encoding.UTF8.GetString(buffer.WrittenSpan));
+            }
+        }
+    }
+
+    private static int RunMcpServer(string[] args)
+    {
+        if (args.Length == 1 && args[0] == "--help")
+        {
+            Console.Error.WriteLine("Usage: BCom mcp [--allow-write --port <exact-port-name>]");
+            return 0;
+        }
+        bool allowWrite = false;
+        string? port = null;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--allow-write") allowWrite = true;
+            else if (args[i] == "--port" && i + 1 < args.Length) port = args[++i];
+            else
+            {
+                Console.Error.WriteLine("Unknown MCP option. Usage: mcp [--allow-write --port PORT]");
+                return 2;
+            }
+        }
+        if (allowWrite && string.IsNullOrWhiteSpace(port))
+        {
+            Console.Error.WriteLine("Write permission requires an explicitly allowed port.");
+            return 2;
+        }
+        SerialMcpServer.RunAsync(Console.In, Console.Out, allowWrite, port, audit: Console.Error)
+            .GetAwaiter().GetResult();
+        return 0;
+    }
+
+    private static int VerifyScript(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.Error.WriteLine("Usage: bcom verify <port> <script.txt> [--baud rate] [--wait ms]");
+            return 2;
+        }
+        int baud = 115200, wait = 1000;
+        for (int i = 2; i < args.Length; i += 2)
+        {
+            if (i + 1 >= args.Length || !int.TryParse(args[i + 1], out int value))
+                return 2;
+            if (args[i] == "--baud") baud = value;
+            else if (args[i] == "--wait") wait = value;
+            else return 2;
+        }
+        try
+        {
+            var steps = SerialAutomation.Parse(System.IO.File.ReadAllText(args[1]));
+            var results = SerialAutomation.Execute(args[0], baud, steps, wait);
+            foreach (var result in results)
+                Console.WriteLine($"Step {result.Step}: {(result.Passed ? "PASS" : "FAIL")} ({result.Detail}, {result.ReceivedBytes} bytes)");
+            return results.Count == steps.Count && results.All(x => x.Passed) ? 0 : 1;
+        }
+        catch (Exception e) when (e is FormatException or System.IO.IOException
+            or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            Console.Error.WriteLine(e.Message);
+            return 1;
+        }
+    }
+
+    private static int ReplayCapture(string[] args)
+    {
+        if (args.Length != 1)
+        {
+            Console.Error.WriteLine("Usage: bcom replay <file.bcomcap>");
+            return 2;
+        }
+        try
+        {
+            ReplayToConsoleAsync(args[0]).GetAwaiter().GetResult();
+            return 0;
+        }
+        catch (Exception e) when (e is System.IO.IOException or System.IO.InvalidDataException
+            or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine(e.Message);
+            return 1;
+        }
+    }
+
+    private static async System.Threading.Tasks.Task ReplayToConsoleAsync(string file)
+    {
+        await foreach (var entry in SerialCapture.ReplayAsync(file))
+        {
+            var writer = new System.Buffers.ArrayBufferWriter<byte>();
+            using (var json = new Utf8JsonWriter(writer))
+            {
+                json.WriteStartObject();
+                json.WriteString("timestamp", entry.Timestamp);
+                json.WriteString("port", entry.Port);
+                json.WriteString("direction", entry.Direction == SerialTraceDirection.Rx ? "rx" : "tx");
+                json.WriteNumber("bytes", entry.Data.Length);
+                json.WriteString("hex", SerialDataConverter.ToHexString(entry.Data));
+                json.WriteEndObject();
+                json.Flush();
+            }
+            Console.WriteLine(Encoding.UTF8.GetString(writer.WrittenSpan));
+        }
     }
 
     private static int ListPorts(string[] args)

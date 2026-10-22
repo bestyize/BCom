@@ -23,6 +23,7 @@ public sealed class MainWindow : Window
     private readonly SerialSessionManager _sessions = new();
     private readonly ComboBox _sessionPicker = new() { MinWidth = 195, MaxWidth = 310 };
     private readonly Button _newSessionButton = new() { MinHeight = 30 };
+    private readonly Button _captureButton = new() { MinHeight = 30 };
     private bool _updatingPicker;
     private SerialSession? _displayedSession;
     private readonly DispatcherTimer _receiveRenderTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
@@ -117,6 +118,9 @@ public sealed class MainWindow : Window
         _newSessionButton.Content = I18n.T("NewConnection");
         Grid.SetColumn(_newSessionButton, 2);
         sessionHeader.Children.Add(_newSessionButton);
+        _captureButton.Content = I18n.T("StartCapture");
+        Grid.SetColumn(_captureButton, 3);
+        sessionHeader.Children.Add(_captureButton);
         var monitorLayout = new Grid
         {
             RowDefinitions = new RowDefinitions("Auto,*"),
@@ -178,6 +182,8 @@ public sealed class MainWindow : Window
             RefreshConnectionControls();
         };
 
+        _captureButton.Click += (_, _) => _ = ToggleCaptureAsync();
+
         // Monitor View Events
         _monitor.SendRequested += HandleSendData;
         _monitor.ComposerChanged += () =>
@@ -230,6 +236,8 @@ public sealed class MainWindow : Window
         _settings.ApplyTheme();
         _newSessionButton.Background = MacTheme.BgSubtle;
         _newSessionButton.Foreground = MacTheme.TextSecondary;
+        _captureButton.Background = MacTheme.BgSubtle;
+        _captureButton.Foreground = MacTheme.TextSecondary;
     }
 
     private void OnThemeChanged(string theme)
@@ -245,6 +253,56 @@ public sealed class MainWindow : Window
             };
         }
         ApplyTheme();
+    }
+
+    private async Task ToggleCaptureAsync()
+    {
+        var session = _sessions.Active;
+        if (session == null || (!session.IsOpen && !session.IsRecording))
+        {
+            await MacDialog.ShowAlertAsync(this, I18n.T("ErrorNotOpen"));
+            return;
+        }
+        try
+        {
+            if (session.IsRecording)
+            {
+                await session.StopRecordingAsync();
+                SetStatus("CaptureStopped");
+            }
+            else
+            {
+                var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+                {
+                    SuggestedFileName = "bcom-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bcomcap",
+                    DefaultExtension = "bcomcap",
+                    FileTypeChoices = new[] { new FilePickerFileType("BCom Capture") { Patterns = new[] { "*.bcomcap" } } }
+                });
+                if (file == null) return;
+                string? path = file.TryGetLocalPath();
+                if (path == null)
+                {
+                    await MacDialog.ShowAlertAsync(this, I18n.T("CaptureLocalOnly"));
+                    return;
+                }
+                session.StartRecording(path);
+                SetStatus("CaptureStarted");
+            }
+            UpdateCaptureButton();
+        }
+        catch (Exception ex)
+        {
+            await MacDialog.ShowAlertAsync(this, I18n.Format("ErrorFile", ex.Message));
+            UpdateCaptureButton();
+        }
+    }
+
+    private void UpdateCaptureButton()
+    {
+        _captureButton.Content = I18n.T(_sessions.Active?.IsRecording == true
+            ? "StopCapture" : "StartCapture");
+        _captureButton.IsEnabled = _sessions.Active?.IsOpen == true ||
+            _sessions.Active?.IsRecording == true;
     }
 
     private void HandleTogglePort()
@@ -324,6 +382,7 @@ public sealed class MainWindow : Window
         _topNav.SetConnectionStatus(session?.IsOpen == true, session?.Config.PortName ?? "");
         RefreshSessionPicker();
         RefreshConnectionControls();
+        UpdateCaptureButton();
         RenderReceived();
     }
 
@@ -356,6 +415,7 @@ public sealed class MainWindow : Window
                 : _monitor.IsShowHex
                     ? SerialDataConverter.ToHexString(bytes)
                     : SerialDataConverter.ToUtf8String(bytes);
+        _monitor.UpdatePlot(session?.Telemetry);
         UpdateCounts();
     }
 
@@ -411,6 +471,7 @@ public sealed class MainWindow : Window
         _monitor.RefreshLanguage();
         _settings.RefreshLanguage();
         _newSessionButton.Content = I18n.T("NewConnection");
+        UpdateCaptureButton();
         _topNav.SetConnectionStatus(_sessions.Active?.IsOpen == true,
             _sessions.Active?.Config.PortName ?? "");
         _statusText.Text = I18n.Format(_statusKey, _statusArguments);
@@ -432,7 +493,8 @@ public sealed class MainWindow : Window
     {
         var session = _sessions.Active;
         _monitor.UpdateCounts(session?.Received.TotalBytes ?? 0,
-            session?.SentBytes ?? 0, session?.Received.Count ?? 0);
+            session?.SentBytes ?? 0, session?.Received.Count ?? 0,
+            session?.UiDroppedBytes ?? 0, session?.CaptureDroppedBytes ?? 0);
     }
 
     private void HandleUtilityLaunch(string kind)
