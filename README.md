@@ -140,6 +140,9 @@ BCom verify COM3 commands.txt --baud 115200 --wait 1500
 BCom decode session.bcomcap lf
 BCom decode session.bcomcap fixed:8 --crc
 BCom decode session.bcomcap length
+BCom template at "AT+GMR"
+BCom template modbus-read 1 0 10
+BCom template nmea-check '$ABC*40'
 ```
 
 Tests stop at the first failing response. Each step is capped at 4 KiB,
@@ -158,8 +161,7 @@ BCom mcp --allow-write --port COM3
 The opt-in `serial_send` command is limited to 4096 bytes per request,
 115200 baud and a 1.5-second write timeout. It opens the specified port per
 call; it cannot share an already opened GUI session. Do not expose this
-process to untrusted MCP clients. No automatic device authorization is
-implemented and no arbitrary shell execution is provided.
+process to untrusted MCP clients. Tool invocations are audited to stderr with timestamps, tool names, selected port and outcome (no payload bytes). No per-request authorization UI is implemented, and no arbitrary shell execution is provided.
 
 ### Raw capture and playback (stage A)
 
