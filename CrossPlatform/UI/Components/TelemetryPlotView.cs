@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
@@ -27,6 +28,7 @@ public sealed class TelemetryPlotView
         Text = "CSV: value1,value2,..."
     };
     private IReadOnlyList<double[]> _samples = Array.Empty<double[]>();
+    private IReadOnlyList<double[]> _visible = Array.Empty<double[]>();
     private static readonly IBrush[] Strokes =
     {
         Brushes.DodgerBlue, Brushes.OrangeRed, Brushes.MediumSeaGreen,
@@ -69,6 +71,17 @@ public sealed class TelemetryPlotView
             Background = MacTheme.BgEditor,
             Child = layout
         };
+        _canvas.PointerMoved += (_, e) =>
+        {
+            if (_visible.Count == 0) return;
+            double width = Math.Max(1, _canvas.Bounds.Width - 8);
+            double fraction = Math.Clamp((e.GetPosition(_canvas).X - 4) / width, 0, 1);
+            int index = (int)Math.Round(fraction * (_visible.Count - 1));
+            string values = string.Join(", ", _visible[index].Select(
+                v => v.ToString("0.###", CultureInfo.InvariantCulture)));
+            _label.Text = I18n.Format("PlotCursor", index + 1, values);
+        };
+        _canvas.PointerExited += (_, _) => Draw();
         _canvas.SizeChanged += (_, _) => Draw();
         RefreshLanguage();
     }
@@ -98,6 +111,7 @@ public sealed class TelemetryPlotView
         double height = _canvas.Height - 10;
         if (width < 10 || _samples.Count < 2) return;
         var visible = _samples.Skip(Math.Max(0, _samples.Count - _windowSize)).ToArray();
+        _visible = visible;
         int channels = 0;
         foreach (var row in visible) channels = Math.Max(channels, row.Length);
         for (int ch = 0; ch < Math.Min(8, channels); ch++)
