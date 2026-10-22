@@ -119,6 +119,7 @@ public sealed class TelemetryPlotView
                 {
                     if (ch >= visible[i].Length)
                     {
+                        if (started) ctx.EndFigure(false);
                         started = false;
                         continue;
                     }
@@ -132,6 +133,7 @@ public sealed class TelemetryPlotView
                     }
                     else ctx.LineTo(point);
                 }
+                if (started) ctx.EndFigure(false);
             }
             _canvas.Children.Add(new Avalonia.Controls.Shapes.Path
             {
