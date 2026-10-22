@@ -111,6 +111,7 @@ public sealed class MonitorView
         session.AppendNewLine = IsNewLine;
         session.ShowHex = IsShowHex;
         session.ShowTimeline = IsTimelineView;
+        session.PlotEnabled = IsPlotEnabled;
         session.FollowOutput = _followTail.IsChecked == true;
         session.SearchQuery = _searchBox.Text ?? "";
     }
@@ -125,6 +126,7 @@ public sealed class MonitorView
             _newline.IsChecked = session?.AppendNewLine == true;
             _showHex.IsChecked = session?.ShowHex == true;
             _timeline.IsChecked = session?.ShowTimeline == true;
+            _plotToggle.IsChecked = session?.PlotEnabled == true;
             _showHex.IsEnabled = !IsTimelineView;
             _followTail.IsChecked = session?.FollowOutput ?? true;
             _searchBox.Text = session?.SearchQuery ?? "";
