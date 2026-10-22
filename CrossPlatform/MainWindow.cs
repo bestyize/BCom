@@ -8,6 +8,7 @@ using Avalonia.Layout;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
+using Avalonia.Threading;
 
 namespace BCom.CrossPlatform;
 
@@ -18,7 +19,9 @@ namespace BCom.CrossPlatform;
 public sealed class MainWindow : Window
 {
     private readonly SerialService _serial = new();
-    private readonly List<byte> _receivedBuffer = new();
+    private readonly BoundedReceiveBuffer _receivedBuffer = new();
+    private readonly DispatcherTimer _receiveRenderTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
+    private bool _receiveDirty;
     private readonly TopNavBar _topNav = new();
     private readonly MonitorView _monitor = new();
     private readonly SettingsPanel _settings = new();
@@ -31,7 +34,8 @@ public sealed class MainWindow : Window
     };
 
     private Border? _bottomBar;
-    private int _sentBytes;
+    private long _sentBytes;
+    private bool _sendBusy;
     private string _statusKey = "StatusReady";
     private object[] _statusArguments = Array.Empty<object>();
     private bool _compact;
@@ -48,8 +52,9 @@ public sealed class MainWindow : Window
         Content = BuildLayout();
         WireEvents();
 
-        Opened += (_, _) => _serial.StartPortScanning();
-        Closed += (_, _) => _serial.Dispose();
+        _receiveRenderTimer.Tick += (_, _) => { if (_receiveDirty) RenderReceived(); };
+        Opened += (_, _) => { _receiveRenderTimer.Start(); _serial.StartPortScanning(); };
+        Closed += (_, _) => { _receiveRenderTimer.Stop(); _serial.Dispose(); };
 
         if (Application.Current != null)
         {
@@ -186,9 +191,20 @@ public sealed class MainWindow : Window
             return;
         }
 
-        var config = _settings.GetConfig();
+        SerialConfig config;
+        try
+        {
+            config = _settings.GetConfig();
+        }
+        catch (ArgumentException ex)
+        {
+            _ = MacDialog.ShowAlertAsync(this, ex.Message);
+            return;
+        }
+
         if (_serial.Open(config, out var error))
         {
+            SerialProfileStore.Save(config);
             SetStatus("StatusOpen", config.PortName);
         }
         else if (error != null)
@@ -201,28 +217,29 @@ public sealed class MainWindow : Window
     {
         _topNav.SetConnectionStatus(isOpen, portName);
         _settings.SetConnectionState(isOpen);
+        if (!isOpen) _settings.ResetPeriodic();
     }
 
     private void HandleDataReceived(byte[] data)
     {
-        for (int i = 0; i < data.Length; i++)
-        {
-            _receivedBuffer.Add(data[i]);
-        }
-        RenderReceived();
+        _receivedBuffer.Append(data);
+        _receiveDirty = true;
     }
 
     private void RenderReceived()
     {
-        var bytes = _receivedBuffer.ToArray();
+        _receiveDirty = false;
+        var bytes = _receivedBuffer.Snapshot();
         _monitor.ReceiveText = _monitor.IsShowHex
             ? SerialDataConverter.ToHexString(bytes)
             : SerialDataConverter.ToUtf8String(bytes);
         UpdateCounts();
     }
 
-    private void HandleSendData()
+    private async void HandleSendData()
     {
+        // A slow device must not accumulate an unbounded queue of timer sends.
+        if (_sendBusy) return;
         if (!_serial.IsOpen)
         {
             _ = MacDialog.ShowAlertAsync(this, I18n.T("ErrorNotOpen"));
@@ -241,14 +258,23 @@ public sealed class MainWindow : Window
             return;
         }
 
-        if (_serial.Write(payload, out var writeError))
+        _sendBusy = true;
+        try
         {
-            _sentBytes += payload.Length;
-            UpdateCounts();
+            var (success, writeError) = await _serial.WriteAsync(payload);
+            if (success)
+            {
+                _sentBytes += payload.Length;
+                UpdateCounts();
+            }
+            else if (writeError != null && _serial.IsOpen)
+            {
+                _ = MacDialog.ShowAlertAsync(this, writeError);
+            }
         }
-        else if (writeError != null)
+        finally
         {
-            _ = MacDialog.ShowAlertAsync(this, writeError);
+            _sendBusy = false;
         }
     }
 
@@ -307,7 +333,7 @@ public sealed class MainWindow : Window
 
     private void UpdateCounts()
     {
-        _monitor.UpdateCounts(_receivedBuffer.Count, _sentBytes);
+        _monitor.UpdateCounts(_receivedBuffer.TotalBytes, _sentBytes, _receivedBuffer.Count);
     }
 
     private void HandleUtilityLaunch(string kind)

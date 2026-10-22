@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO.Ports;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 
 namespace BCom.CrossPlatform;
@@ -69,6 +70,7 @@ OPTIONS FOR 'monitor':
   --duration <ms>             Listen duration in milliseconds (default: 5000, 0 = indefinite)
   --hex                       Display captured data in hexadecimal format
   --json                      Output captured buffer as JSON
+  --jsonl                     Emit timestamped newline-delimited JSON events
 
 EXAMPLES FOR AI AGENTS:
   bcom ports --json
@@ -125,7 +127,7 @@ EXAMPLES FOR AI AGENTS:
         }
 
         var portName = args[0];
-        var baud = GetIntOption(args, "--baud", 115200);
+        if (!TryGetIntOption(args, "--baud", 115200, 1, 10000000, out var baud)) return 2;
 
         try
         {
@@ -151,8 +153,8 @@ EXAMPLES FOR AI AGENTS:
 
         var portName = args[0];
         var inputData = args[1];
-        var baud = GetIntOption(args, "--baud", 115200);
-        var waitMs = GetIntOption(args, "--wait", 1000);
+        if (!TryGetIntOption(args, "--baud", 115200, 1, 10000000, out var baud)) return 2;
+        if (!TryGetIntOption(args, "--wait", 1000, 0, 600000, out var waitMs)) return 2;
         var isHex = args.Any(a => a.Equals("--hex", StringComparison.OrdinalIgnoreCase));
         var crlf = args.Any(a => a.Equals("--crlf", StringComparison.OrdinalIgnoreCase));
         var rts = args.Any(a => a.Equals("--rts", StringComparison.OrdinalIgnoreCase));
@@ -241,10 +243,23 @@ EXAMPLES FOR AI AGENTS:
         }
 
         var portName = args[0];
-        var baud = GetIntOption(args, "--baud", 115200);
-        var duration = GetIntOption(args, "--duration", 5000);
+        if (!TryGetIntOption(args, "--baud", 115200, 1, 10000000, out var baud)) return 2;
+        if (!TryGetIntOption(args, "--duration", 5000, 0, 3600000, out var duration)) return 2;
         var isHex = args.Any(a => a.Equals("--hex", StringComparison.OrdinalIgnoreCase));
         var asJson = args.Any(a => a.Equals("--json", StringComparison.OrdinalIgnoreCase));
+        var asJsonLines = args.Any(a => a.Equals("--jsonl", StringComparison.OrdinalIgnoreCase));
+        if (asJson && asJsonLines)
+        {
+            Console.Error.WriteLine("Choose either --json or --jsonl.");
+            return 2;
+        }
+
+        // JSON aggregation of an indefinite stream has no bounded result.
+        if (asJson && duration == 0)
+        {
+            Console.Error.WriteLine("Use a finite --duration with --json; indefinite capture must be streamed.");
+            return 2;
+        }
 
         var collected = new List<byte>();
 
@@ -256,7 +271,7 @@ EXAMPLES FOR AI AGENTS:
             };
 
             port.Open();
-            if (!asJson)
+            if (!asJson && !asJsonLines)
             {
                 Console.WriteLine($"Monitoring {portName} at {baud} baud (duration: {(duration > 0 ? $"{duration}ms" : "indefinite, press Ctrl+C to stop")})...");
             }
@@ -271,9 +286,17 @@ EXAMPLES FOR AI AGENTS:
                     int read = port.Read(buffer, 0, Math.Min(buffer.Length, port.BytesToRead));
                     if (read > 0)
                     {
-                        for (int i = 0; i < read; i++) collected.Add(buffer[i]);
+                        if (asJson)
+                            for (int i = 0; i < read; i++) collected.Add(buffer[i]);
 
-                        if (!asJson)
+                        if (asJsonLines)
+                        {
+                            var chunk = buffer.Take(read).ToArray();
+                            string timestamp = DateTimeOffset.UtcNow.ToString("O");
+                            Console.WriteLine($"{{\"event\":\"data\",\"timestamp\":\"{timestamp}\",\"port\":\"{EscapeJson(portName)}\",\"bytes\":{read},\"hex\":\"{SerialDataConverter.ToHexString(chunk)}\"}}");
+                            Console.Out.Flush();
+                        }
+                        else if (!asJson)
                         {
                             var chunk = buffer.Take(read).ToArray();
                             Console.Write(isHex ? SerialDataConverter.ToHexString(chunk) + " " : SerialDataConverter.ToUtf8String(chunk));
@@ -286,7 +309,7 @@ EXAMPLES FOR AI AGENTS:
                 }
             }
 
-            if (!asJson && isHex) Console.WriteLine();
+            if (!asJson && !asJsonLines && isHex) Console.WriteLine();
 
             if (asJson)
             {
@@ -298,34 +321,38 @@ EXAMPLES FOR AI AGENTS:
         }
         catch (Exception ex)
         {
-            if (asJson)
-                Console.WriteLine($"{{\"error\":\"{EscapeJson(ex.Message)}\"}}");
+            if (asJson || asJsonLines)
+                Console.WriteLine($"{{\"event\":\"error\",\"error\":\"{EscapeJson(ex.Message)}\"}}");
             else
                 Console.Error.WriteLine($"Monitor Error: {ex.Message}");
             return 1;
         }
     }
 
-    private static int GetIntOption(string[] args, string flag, int defaultValue)
+    private static bool TryGetIntOption(
+        string[] args, string flag, int defaultValue, int min, int max, out int value)
     {
-        for (int i = 0; i < args.Length - 1; i++)
+        value = defaultValue;
+        for (int i = 0; i < args.Length; i++)
         {
-            if (args[i].Equals(flag, StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var val))
+            if (!args[i].Equals(flag, StringComparison.OrdinalIgnoreCase)) continue;
+            if (i + 1 >= args.Length ||
+                !int.TryParse(args[i + 1], out var parsed) ||
+                parsed < min || parsed > max)
             {
-                return val;
+                Console.Error.WriteLine($"Invalid {flag}: expected an integer between {min} and {max}.");
+                return false;
             }
+            value = parsed;
         }
-        return defaultValue;
+        return true;
     }
 
     private static string EscapeJson(string? s)
     {
-        if (string.IsNullOrEmpty(s)) return string.Empty;
-        return s.Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n")
-                .Replace("\t", "\\t");
+        // JsonEncodedText handles all U+0000..U+001F control characters,
+        // quotes and backslashes (unlike the previous manual replacement).
+        return JsonEncodedText.Encode(s ?? string.Empty).ToString();
     }
 
     private static int HandleUnknownCommand(string command)

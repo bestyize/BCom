@@ -103,6 +103,20 @@ jobs:
           fi
           find publish -type f -name '*.pdb' -delete
 
+      - name: Run serial core regression tests
+        shell: bash
+        run: dotnet test Tests/BCom.Tests.csproj -c Release --verbosity normal
+
+      - name: Smoke test published CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            ./publish/BCom.exe --help
+          else
+            ./publish/BCom --help
+          fi
+
       - name: Smoke test Linux GUI startup
         if: runner.os == 'Linux'
         shell: bash
@@ -205,10 +219,17 @@ jobs:
 
           test -s "${win[0]}"
           test -s "${linux[0]}"
-          test -s "${mac_arm[0]}"
-          test -s "${mac_x64[0]}"
-
-          packages=("${win[0]}" "${linux[0]}" "${mac_arm[0]}" "${mac_x64[0]}")
+          packages=("${win[0]}" "${linux[0]}")
+          unnotarized=(dist/*.unnotarized)
+          if (( ${#unnotarized[@]} == 0 )); then
+            test -s "${mac_arm[0]}"
+            test -s "${mac_x64[0]}"
+            packages+=("${mac_arm[0]}" "${mac_x64[0]}")
+            echo "MACOS_NOTARIZED=true" >> "$GITHUB_ENV"
+          else
+            echo "::warning::macOS builds lack Developer ID notarization; DMGs are CI-only, omitted from Release."
+            echo "MACOS_NOTARIZED=false" >> "$GITHUB_ENV"
+          fi
           ( cd dist && for file in "${packages[@]}"; do sha256sum "${file##*/}"; done ) > dist/SHA256SUMS.txt
           printf '%s\n' "${packages[@]}" >> "$GITHUB_STEP_SUMMARY"
           echo "ASSET_COUNT=${#packages[@]}" >> "$GITHUB_ENV"
@@ -234,7 +255,11 @@ jobs:
           linux=(dist/*-linux-x64.tar.gz)
           mac_arm=(dist/*-osx-arm64.dmg)
           mac_x64=(dist/*-osx-x64.dmg)
-          packages=("${win[0]}" "${linux[0]}" "${mac_arm[0]}" "${mac_x64[0]}" "dist/SHA256SUMS.txt")
+          packages=("${win[0]}" "${linux[0]}")
+          if [[ "$MACOS_NOTARIZED" == "true" ]]; then
+            packages+=("${mac_arm[0]}" "${mac_x64[0]}")
+          fi
+          packages+=("dist/SHA256SUMS.txt")
           extra_args=()
           if [[ "${{ inputs.draft }}" == "true" ]]; then extra_args+=(--draft); fi
           if [[ "${{ inputs.prerelease }}" == "true" ]]; then extra_args+=(--prerelease); fi

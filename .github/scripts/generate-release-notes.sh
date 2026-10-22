@@ -10,6 +10,16 @@ if [[ -f dist/SHA256SUMS.txt ]]; then
 fi
 
 mkdir -p dist
+mac_rows=""
+if [[ "${MACOS_NOTARIZED:-false}" == "true" ]]; then
+  mac_rows="| **macOS (Apple Silicon)** | \`BCom-${tag}-osx-arm64.dmg\` | Notarized DMG |"
+  mac_rows="$mac_rows
+| **macOS (Intel)** | \`BCom-${tag}-osx-x64.dmg\` | Notarized DMG |"
+  mac_note="Apple Developer ID signed and notarized macOS installers are included in this release."
+else
+  mac_note="macOS installers are not included in this release because Apple notarization was unavailable. Ad-hoc signed builds are retained as CI test artifacts only."
+fi
+
 cat > dist/RELEASE_NOTES.md <<EOF
 ## BCom ${tag}
 
@@ -20,23 +30,16 @@ Cross-platform serial communication and debugging assistant built with **.NET 10
 | Platform | Package | Notes |
 | :--- | :--- | :--- |
 | **Windows (x64)** | \`BCom-${tag}-win-x64.zip\` | Extract and run \`BCom.exe\` |
-| **macOS (Apple Silicon M-Series)** | \`BCom-${tag}-osx-arm64.dmg\` | Open DMG and drag \`BCom.app\` to Applications |
-| **macOS (Intel x86_64)** | \`BCom-${tag}-osx-x64.dmg\` | Open DMG and drag \`BCom.app\` to Applications |
+${mac_rows}
 | **Linux (x64)** | \`BCom-${tag}-linux-x64.tar.gz\` | Extract and run \`./BCom\` |
 
 All packages are self-contained and do not require a pre-installed .NET runtime.
 
 ---
 
-### 🍎 macOS First-Launch Notice (Gatekeeper)
+### 🍎 macOS Availability
 
-If macOS displays a warning that the application is damaged or from an unidentified developer:
-1. Open the built-in **Terminal** app.
-2. Run the following command to remove the quarantine flag:
-   \`\`\`bash
-   xattr -cr /Applications/BCom.app
-   \`\`\`
-3. Double-click \`BCom.app\` in Applications to launch normally. Alternatively, click **Open Anyway** in **System Settings -> Privacy & Security**.
+${mac_note}
 
 ---
 

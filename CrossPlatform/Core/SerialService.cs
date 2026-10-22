@@ -1,6 +1,8 @@
 using System;
 using System.IO.Ports;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 
 namespace BCom.CrossPlatform;
@@ -12,6 +14,7 @@ namespace BCom.CrossPlatform;
 public sealed class SerialService : IDisposable
 {
     private SerialPort? _port;
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly DispatcherTimer _scanTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _periodicTimer = new();
     private Action? _periodicAction;
@@ -63,6 +66,13 @@ public sealed class SerialService : IDisposable
             _lastPorts = current;
             PortsScanned?.Invoke(current);
         }
+
+        // SerialPort.IsOpen may stay true after a USB serial adapter is removed.
+        if (IsOpen && !current.Contains(CurrentPortName, StringComparer.OrdinalIgnoreCase))
+        {
+            Close();
+            ErrorOccurred?.Invoke(I18n.T("ErrorDisconnected"));
+        }
     }
 
     public bool Open(SerialConfig config, out string? errorMessage)
@@ -76,9 +86,10 @@ public sealed class SerialService : IDisposable
             return false;
         }
 
+        SerialPort? port = null;
         try
         {
-            var port = new SerialPort(config.PortName)
+            port = new SerialPort(config.PortName)
             {
                 BaudRate = config.BaudRate,
                 DataBits = config.DataBits,
@@ -86,7 +97,9 @@ public sealed class SerialService : IDisposable
                 Parity = config.Parity,
                 Encoding = System.Text.Encoding.UTF8,
                 RtsEnable = config.RtsEnable,
-                DtrEnable = config.DtrEnable
+                DtrEnable = config.DtrEnable,
+                WriteTimeout = 1500,
+                ReadTimeout = 1500
             };
 
             port.DataReceived += OnSerialDataReceived;
@@ -98,6 +111,11 @@ public sealed class SerialService : IDisposable
         }
         catch (Exception ex)
         {
+            if (port != null)
+            {
+                port.DataReceived -= OnSerialDataReceived;
+                port.Dispose();
+            }
             errorMessage = I18n.Format("ErrorOpen", config.PortName, ex.Message);
             ErrorOccurred?.Invoke(errorMessage);
             return false;
@@ -163,6 +181,51 @@ public sealed class SerialService : IDisposable
             errorMessage = I18n.Format("ErrorSend", ex.Message);
             ErrorOccurred?.Invoke(errorMessage);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Serializes outgoing writes on a worker thread so a blocked device cannot
+    /// freeze Avalonia's dispatcher. Close/disconnect errors are reported to
+    /// the caller without accessing UI controls from a worker thread.
+    /// </summary>
+    public async Task<(bool Success, string? Error)> WriteAsync(
+        byte[] data, CancellationToken cancellationToken = default)
+    {
+        if (data.Length == 0) return (true, null);
+
+        try
+        {
+            await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return (false, "Send cancelled.");
+        }
+
+        try
+        {
+            var port = _port;
+            if (port?.IsOpen != true)
+                return (false, I18n.T("ErrorNotOpen"));
+
+            await Task.Run(() => port.Write(data, 0, data.Length), cancellationToken)
+                .ConfigureAwait(false);
+            return (true, null);
+        }
+        catch (OperationCanceledException)
+        {
+            return (false, "Send cancelled.");
+        }
+        catch (Exception ex)
+        {
+            var message = I18n.Format("ErrorSend", ex.Message);
+            Dispatcher.UIThread.Post(() => ErrorOccurred?.Invoke(message));
+            return (false, message);
+        }
+        finally
+        {
+            _writeGate.Release();
         }
     }
 

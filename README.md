@@ -32,7 +32,12 @@ bcom send COM3 "01 03 00 00 00 02 C4 0B" --hex --wait 500
 
 # Monitor serial output for 5000ms
 bcom monitor /dev/ttyACM0 --baud 115200 --duration 5000 --json
+
+# Stream timestamped NDJSON events, including long-running captures
+bcom monitor /dev/ttyACM0 --baud 115200 --duration 0 --jsonl > capture.ndjson
 ```
+
+In the GUI, the received-data display keeps the latest **128 KiB** of bytes to avoid unbounded memory growth; the visible-text export reflects this limited window, not a full historical capture. For persistent monitoring, use CLI `monitor --jsonl` with output redirection. The GUI also supports custom baud rates, a follow-output toggle, and persistence of the last successful serial connection settings.
 
 A ready-to-use AI agent skill is included in [`.claude/skills/bcom-serial/SKILL.md`](.claude/skills/bcom-serial/SKILL.md) for Claude Code and automated agents to seamlessly discover and debug hardware.
 
@@ -47,7 +52,7 @@ A ready-to-use AI agent skill is included in [`.claude/skills/bcom-serial/SKILL.
 | macOS Intel | `BCom-*-osx-x64.dmg` | Open DMG and drag `BCom.app` to Applications |
 | Linux x64 | `BCom-*-linux-x64.tar.gz` | Extract and run `./BCom` |
 
-All packages are self-contained and do not need a separate .NET runtime.
+All packages are self-contained and do not need a separate .NET runtime. **Official macOS DMGs are only included in future releases when Developer ID signing and Apple notarization succeed.** Otherwise, ad-hoc signed macOS test builds remain available as GitHub Actions artifacts and are excluded from the Release download list.
 
 ### macOS installation and Gatekeeper
 
@@ -104,7 +109,7 @@ GitHub Actions builds packages for Windows, macOS Intel, macOS Apple Silicon, an
    - Go to the **Actions** tab -> select **Build and release BCom**.
    - Click **Run workflow**, check `Publish as GitHub Release`, and enter the version tag (e.g. `v3.2.0`).
 
-The pipeline validates package archives, generates SHA-256 checksums, and uploads complete installation assets for all 4 platforms to the release.
+The pipeline validates package archives, generates SHA-256 checksums, and publishes Windows/Linux installers. macOS DMGs are published to the Release only after Developer ID signing and notarization; unnotarized DMGs are CI-only test artifacts.
 
 If you have an Apple Developer account, configure the following repository secrets to automatically enable official Apple notarization:
 

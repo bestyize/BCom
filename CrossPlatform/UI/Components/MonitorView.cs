@@ -36,6 +36,7 @@ public sealed class MonitorView
         BorderThickness = new Thickness(1)
     };
 
+    private readonly CheckBox _followTail = new() { FontSize = 12, IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _showHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _sendHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _newline = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
@@ -81,7 +82,8 @@ public sealed class MonitorView
         set
         {
             _output.Text = value;
-            _output.CaretIndex = value?.Length ?? 0;
+            if (_followTail.IsChecked == true)
+                _output.CaretIndex = value?.Length ?? 0;
         }
     }
 
@@ -93,9 +95,12 @@ public sealed class MonitorView
         RefreshLanguage();
     }
 
-    public void UpdateCounts(int rxCount, int txCount)
+    public void UpdateCounts(long rxCount, long txCount, int visibleBytes = 0)
     {
-        _rxCountBadge.Text = $"{I18n.T("RxLabel")}: {rxCount} {I18n.T("BytesUnit")}";
+        string historyHint = rxCount > visibleBytes
+            ? $" · {I18n.T("VisibleBytes")}: {visibleBytes} {I18n.T("BytesUnit")}"
+            : string.Empty;
+        _rxCountBadge.Text = $"{I18n.T("RxLabel")}: {rxCount} {I18n.T("BytesUnit")}{historyHint}";
         _txCountBadge.Text = $"{I18n.T("TxLabel")}: {txCount} {I18n.T("BytesUnit")}";
     }
 
@@ -109,6 +114,7 @@ public sealed class MonitorView
         if (_clearSendBtn != null) _clearSendBtn.Content = I18n.T("ClearSend");
         if (_sendButton != null) _sendButton.Content = I18n.T("Send");
 
+        _followTail.Content = I18n.T("FollowTail");
         _showHex.Content = I18n.T("HexDisplay");
         _sendHex.Content = I18n.T("HexSend");
         _newline.Content = I18n.T("NewLine");
@@ -212,6 +218,7 @@ public sealed class MonitorView
             Spacing = 8,
             VerticalAlignment = VerticalAlignment.Center
         };
+        receiveActions.Children.Add(_followTail);
         receiveActions.Children.Add(_showHex);
         _clearReceiveBtn = MacTheme.CreateSecondaryButton(I18n.T("ClearReceive"), () => ClearReceiveRequested?.Invoke());
         _exportReceiveBtn = MacTheme.CreateSecondaryButton(I18n.T("Export"), () => ExportReceiveRequested?.Invoke());
