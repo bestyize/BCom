@@ -33,6 +33,7 @@ public static class CliHandler
             "replay" => ReplayCapture(cmdArgs),
             "verify" => VerifyScript(cmdArgs),
             "decode" => DecodeCapture(cmdArgs),
+            "template" => PrintProtocolTemplate(cmdArgs),
             "mcp" => RunMcpServer(cmdArgs),
             _ => HandleUnknownCommand(command)
         };
@@ -60,6 +61,7 @@ COMMANDS:
   replay <file.bcomcap>       Replay a recorded capture as timestamped JSONL
   verify <port> <script.txt>  Execute bounded send/expect steps against a port
   decode <file> <mode>        Decode RX capture into frames (lf, length, fixed:N)
+  template <protocol>         Generate safe AT/Modbus frames or verify NMEA checksums
   mcp [--allow-write --port P] Run a local MCP stdio server (read-only by default)
   gui                         Launch graphical desktop interface (default)
   help, --help, -h            Show this command reference
@@ -85,6 +87,39 @@ EXAMPLES FOR AI AGENTS:
   bcom send /dev/tty.usbserial-10 ""AT"" --crlf --wait 1000 --json
   bcom send COM3 ""0A FF 12"" --hex --wait 500
   bcom monitor /dev/ttyACM0 --baud 9600 --duration 3000");
+    }
+
+    private static int PrintProtocolTemplate(string[] args)
+    {
+        try
+        {
+            byte[] bytes;
+            if (args.Length is >= 1 and <= 2 && args[0] == "at")
+                bytes = SerialProtocolTemplates.AtCommand(args.Length == 2 ? args[1] : "AT");
+            else if (args.Length == 4 && args[0] == "modbus-read" &&
+                byte.TryParse(args[1], out var slave) &&
+                ushort.TryParse(args[2], out var first) &&
+                ushort.TryParse(args[3], out var count))
+                bytes = SerialProtocolTemplates.ModbusReadHoldingRegisters(slave, first, count);
+            else if (args.Length == 2 && args[0] == "nmea-check")
+            {
+                bool valid = SerialProtocolTemplates.ValidateNmeaChecksum(args[1]);
+                Console.WriteLine(valid ? "valid checksum" : "invalid checksum");
+                return valid ? 0 : 1;
+            }
+            else
+            {
+                Console.Error.WriteLine("Usage: BCom template at [command] | modbus-read <slave> <register> <count> | nmea-check <sentence>");
+                return 2;
+            }
+            Console.WriteLine(SerialDataConverter.ToHexString(bytes));
+            return 0;
+        }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            return 2;
+        }
     }
 
     private static int DecodeCapture(string[] args)
