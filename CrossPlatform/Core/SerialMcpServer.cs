@@ -19,7 +19,8 @@ namespace BCom.CrossPlatform;
 public static class SerialMcpServer
 {
     public static async Task RunAsync(TextReader input, TextWriter output,
-        bool allowWrite = false, string? allowedPort = null, CancellationToken cancellation = default)
+        bool allowWrite = false, string? allowedPort = null,
+        CancellationToken cancellation = default, TextWriter? audit = null)
     {
         while (true)
         {
@@ -121,6 +122,17 @@ public static class SerialMcpServer
                         json.WriteEndArray();
                         if (isError) json.WriteBoolean("isError", true);
                         json.WriteEndObject();
+                        if (audit != null && (tool == "serial_send" || tool == "serial_list_ports"))
+                        {
+                            // Structured audit metadata only: never log payloads or serial response bytes.
+                            try
+                            {
+                                await audit.WriteLineAsync(
+                                    $"{DateTimeOffset.UtcNow:O} tool={tool} port={(tool == "serial_send" ? allowedPort : "-")} outcome={(isError ? "error" : "ok")}");
+                                await audit.FlushAsync();
+                            }
+                            catch (IOException) { /* Logging failure must not break JSON-RPC. */ }
+                        }
                     }
                     else
                     {
