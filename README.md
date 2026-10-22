@@ -117,6 +117,27 @@ case-insensitive occurrence in the currently displayed window. Neither the
 timeline nor the search includes evicted history. For full captures, use
 `monitor --jsonl` and redirect output to a file.
 
+### Raw capture and playback (stage A)
+
+Select a connected session and click **Record** to write loss-accounted
+`.bcomcap` files directly from the serial worker (not from the display).
+Recording includes RX and completed TX with UTC timestamps and rotates at
+64 MiB per file (`.part001`, `.part002`, etc.). The in-memory capture queue
+is bounded; if the disk cannot keep up, dropped bytes are counted rather
+than growing RAM indefinitely. Stop recording to flush buffered records.
+
+Replay one file or rotated part as JSONL without opening a serial port:
+
+```bash
+BCom replay session.bcomcap
+BCom replay session.bcomcap.part001
+```
+
+Display history is separately bounded and may omit received bytes under
+extreme GUI backlog. Capture timestamps are read-callback timestamps, **not**
+protocol-frame or individual-byte times. For a multi-file recording, replay
+its parts in sequence.
+
 ## Automated serial integration testing
 
 On Linux, the CI pipeline tests the **published** BCom executable against a
