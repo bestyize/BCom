@@ -204,6 +204,7 @@ public sealed class MainWindow : Window
 
         if (_serial.Open(config, out var error))
         {
+            SerialProfileStore.Save(config);
             SetStatus("StatusOpen", config.PortName);
         }
         else if (error != null)
