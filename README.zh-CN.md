@@ -30,7 +30,12 @@ bcom send COM3 "01 03 00 00 00 02 C4 0B" --hex --wait 500
 
 # 监听单片机日志输出 5000 毫秒
 bcom monitor /dev/ttyACM0 --baud 115200 --duration 5000 --json
+
+# 流式输出带时间戳的 JSON Lines，支持持续运行
+bcom monitor /dev/ttyACM0 --baud 115200 --duration 0 --jsonl > capture.ndjson
 ```
+
+图形界面的接收历史只保留最近 **128 KiB** 原始数据，以限制内存占用；界面“导出”仅包含当前显示窗口，而非完整历史记录。需要长期完整记录时，请使用 `monitor --jsonl` 命令并将输出重定向到文件。图形界面另外支持自定义波特率、自动跟随开关，并在成功连接后保存串口配置。
 
 项目内置针对 Claude Code 的专属控制技能：[`.claude/skills/bcom-serial/SKILL.md`](.claude/skills/bcom-serial/SKILL.md)，AI Agent 能够直接调用该技能完成微控制器探测、固件问答以及设备调试。
 
@@ -45,7 +50,7 @@ bcom monitor /dev/ttyACM0 --baud 115200 --duration 5000 --json
 | macOS Intel (x64) | `BCom-*-osx-x64.dmg` | 双击挂载后拖拽 `BCom.app` 至 Applications |
 | Linux x64 | `BCom-*-linux-x64.tar.gz` | 解压后执行 `./BCom` |
 
-构建产物均为自包含包，无需另装 .NET Runtime。
+构建产物均为自包含包，无需另装 .NET Runtime。**新的正式发行版仅在 Apple Developer ID 签名与公证成功时包含 macOS DMG。** 未公证的 macOS 测试包仍可从 Actions 构建产物中获取，但不列入正式 Release 下载项。
 
 ### macOS 安装与 Gatekeeper 提示解决办法
 
@@ -102,7 +107,7 @@ dotnet publish BCom.csproj -c Release -r <runtime-id> --self-contained true -p:P
    - 进入 Actions -> 选择 **Build and release BCom** 工作流。
    - 点击 **Run workflow**，勾选 `Publish as GitHub Release`，输入标签名称（如 `v3.2.0`）。
 
-流水线将自动校验构建产物、生成 SHA-256 校验和、编写包含安装说明的 Release 说明，并上传全部 4 个平台的完整安装包。若同时配置了 Apple 开发者密钥，macOS DMG 还将自动完成 Apple 官方公证。
+流水线自动校验构建产物并生成 SHA-256 校验和。Windows/Linux 安装包正常发布；macOS DMG 只有完成 Developer ID 签名及 Apple 官方公证后才进入 Release，未公证的包仅作为 CI 测试产物。
 
 要启用 Apple 官方公证（可选），在 GitHub Actions Secrets 配置：
 
