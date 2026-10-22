@@ -117,6 +117,47 @@ case-insensitive occurrence in the currently displayed window. Neither the
 timeline nor the search includes evicted history. For full captures, use
 `monitor --jsonl` and redirect output to a file.
 
+## Embedded diagnostic workbench (stages B–D)
+
+**Quick Plot (B):** select a connected serial session and enable **Quick Plot**
+to graph numeric ASCII lines such as `12.4,0.5,-2\n`. The plot supports
+up to eight channels and keeps the most recent 512 CSV samples *per session*.
+Invalid values, NaN and Infinity are ignored; plotting is a lightweight
+live preview, not a replacement for raw capture.
+
+**Protocol decoding and device checks (C):** `SerialFrameDecoder` provides
+stream-safe newline, fixed-length and 1-byte length-prefixed framing,
+plus Modbus RTU CRC16 verification. The CLI supports declarative test files:
+
+```text
+# commands.txt — sent request => expected substring (exact bytes)
+AT\\r\\n => OK
+HEX:01 03 00 00 00 0A C5 CD => HEX:01 03
+```
+
+```bash
+BCom verify COM3 commands.txt --baud 115200 --wait 1500
+```
+
+Tests stop at the first failing response. Each step is capped at 4 KiB,
+the suite at 256 steps, and each wait at 30 seconds. There is no script
+execution environment or implicit retry.
+
+**Agent tools (D):** BCom includes a **local stdio MCP server** with
+`serial_list_ports` enabled by default. Device writes require both
+an explicit opt-in and an exact port allowlist at startup:
+
+```bash
+BCom mcp
+BCom mcp --allow-write --port COM3
+```
+
+The opt-in `serial_send` command is limited to 4096 bytes per request,
+115200 baud and a 1.5-second write timeout. It opens the specified port per
+call; it cannot share an already opened GUI session. Do not expose this
+process to untrusted MCP clients. No automatic device authorization is
+implemented and no arbitrary shell execution is provided.
+
 ### Raw capture and playback (stage A)
 
 Select a connected session and click **Record** to write loss-accounted
