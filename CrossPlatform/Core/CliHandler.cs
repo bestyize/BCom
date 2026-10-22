@@ -32,6 +32,7 @@ public static class CliHandler
             "monitor" or "read" => MonitorPort(cmdArgs),
             "replay" => ReplayCapture(cmdArgs),
             "verify" => VerifyScript(cmdArgs),
+            "mcp" => RunMcpServer(cmdArgs),
             _ => HandleUnknownCommand(command)
         };
     }
@@ -57,6 +58,7 @@ COMMANDS:
   monitor <port>              Listen on a serial port and stream received data
   replay <file.bcomcap>       Replay a recorded capture as timestamped JSONL
   verify <port> <script.txt>  Execute bounded send/expect steps against a port
+  mcp [--allow-write --port P] Run a local MCP stdio server (read-only by default)
   gui                         Launch graphical desktop interface (default)
   help, --help, -h            Show this command reference
 
@@ -81,6 +83,35 @@ EXAMPLES FOR AI AGENTS:
   bcom send /dev/tty.usbserial-10 ""AT"" --crlf --wait 1000 --json
   bcom send COM3 ""0A FF 12"" --hex --wait 500
   bcom monitor /dev/ttyACM0 --baud 9600 --duration 3000");
+    }
+
+    private static int RunMcpServer(string[] args)
+    {
+        if (args.Length == 1 && args[0] == "--help")
+        {
+            Console.Error.WriteLine("Usage: BCom mcp [--allow-write --port <exact-port-name>]");
+            return 0;
+        }
+        bool allowWrite = false;
+        string? port = null;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--allow-write") allowWrite = true;
+            else if (args[i] == "--port" && i + 1 < args.Length) port = args[++i];
+            else
+            {
+                Console.Error.WriteLine("Unknown MCP option. Usage: mcp [--allow-write --port PORT]");
+                return 2;
+            }
+        }
+        if (allowWrite && string.IsNullOrWhiteSpace(port))
+        {
+            Console.Error.WriteLine("Write permission requires an explicitly allowed port.");
+            return 2;
+        }
+        SerialMcpServer.RunAsync(Console.In, Console.Out, allowWrite, port)
+            .GetAwaiter().GetResult();
+        return 0;
     }
 
     private static int VerifyScript(string[] args)
