@@ -93,7 +93,7 @@ public sealed class MonitorView
         RefreshLanguage();
     }
 
-    public void UpdateCounts(int rxCount, int txCount)
+    public void UpdateCounts(long rxCount, long txCount)
     {
         _rxCountBadge.Text = $"{I18n.T("RxLabel")}: {rxCount} {I18n.T("BytesUnit")}";
         _txCountBadge.Text = $"{I18n.T("TxLabel")}: {txCount} {I18n.T("BytesUnit")}";
