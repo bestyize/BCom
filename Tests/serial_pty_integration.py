@@ -106,7 +106,7 @@ class BComPtyIntegrationTests(unittest.TestCase):
     def test_verify_cli_executes_declarative_send_expect(self):
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".txt",
                                      delete=False) as commands:
-            commands.write("AT => OK\\r\\n\\n")
+            commands.write("AT => OK\r\n\n")
             script_path = commands.name
         try:
             process = self.run_cli(
@@ -114,7 +114,7 @@ class BComPtyIntegrationTests(unittest.TestCase):
             )
             try:
                 self.assertIn(b"AT", self.read_master_until(b"AT"))
-                os.write(self.master_fd, b"OK\\r\\n")
+                os.write(self.master_fd, b"OK\r\n")
                 stdout, stderr = process.communicate(timeout=7)
             finally:
                 if process.poll() is None:
@@ -133,7 +133,7 @@ class BComPtyIntegrationTests(unittest.TestCase):
                                            "arguments": {"data": "AT"}}})
         result = subprocess.run(
             [BINARY, "mcp"],
-            input="\\n".join([initialize, list_tools, try_write, ""]),
+            input="\n".join([initialize, list_tools, try_write, ""]),
             capture_output=True, text=True, timeout=6,
         )
         self.assertEqual(0, result.returncode, result.stderr)
