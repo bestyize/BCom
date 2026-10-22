@@ -157,12 +157,17 @@ public sealed class MonitorView
         RefreshLanguage();
     }
 
-    public void UpdateCounts(long rxCount, long txCount, int visibleBytes = 0)
+    public void UpdateCounts(long rxCount, long txCount, int visibleBytes = 0,
+        long uiDroppedBytes = 0, long captureDroppedBytes = 0)
     {
         string historyHint = rxCount > visibleBytes
             ? $" · {I18n.T("VisibleBytes")}: {visibleBytes} {I18n.T("BytesUnit")}"
             : string.Empty;
-        _rxCountBadge.Text = $"{I18n.T("RxLabel")}: {rxCount} {I18n.T("BytesUnit")}{historyHint}";
+        string lossHint = uiDroppedBytes > 0
+            ? $" · {I18n.T("UiDrops")}: {uiDroppedBytes}" : "";
+        string captureHint = captureDroppedBytes > 0
+            ? $" · {I18n.T("CaptureDrops")}: {captureDroppedBytes}" : "";
+        _rxCountBadge.Text = $"{I18n.T("RxLabel")}: {rxCount} {I18n.T("BytesUnit")}{historyHint}{lossHint}{captureHint}";
         _txCountBadge.Text = $"{I18n.T("TxLabel")}: {txCount} {I18n.T("BytesUnit")}";
     }
 
