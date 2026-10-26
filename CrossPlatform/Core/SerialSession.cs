@@ -188,6 +188,38 @@ public sealed class SerialSession : IDisposable
         finally { _sending = false; }
     }
 
+    /// <summary>Runs a bounded, explicit sequence; no retry on disconnect.</summary>
+    public async Task<(bool Success, string? Error)> RunMacroAsync(
+        System.Collections.Generic.IReadOnlyList<SerialMacroStep> steps, CancellationToken token = default)
+    {
+        if (_disposed || !Service.IsOpen) return (false, I18n.T("ErrorNotOpen"));
+        if (_sending) return (false, "Another send is in progress.");
+        _sending = true;
+        try
+        {
+            foreach (var step in steps)
+            {
+                token.ThrowIfCancellationRequested();
+                if (!IsOpen) return (false, "Port disconnected; macro stopped.");
+                if (step.Payload.Length == 0)
+                {
+                    await Task.Delay(step.WaitMilliseconds, token);
+                    continue;
+                }
+                var (ok, error) = await Service.WriteAsync(step.Payload, token);
+                if (!ok) return (false, error);
+                SentBytes += step.Payload.Length;
+                var timestamp = DateTimeOffset.UtcNow;
+                Trace.Append(timestamp, Config.PortName, SerialTraceDirection.Tx, step.Payload);
+                System.Threading.Volatile.Read(ref _capture)?.TryRecord(timestamp, SerialTraceDirection.Tx, step.Payload);
+                Changed?.Invoke(this);
+            }
+            return (true, null);
+        }
+        catch (OperationCanceledException) { return (false, "Macro cancelled."); }
+        finally { _sending = false; }
+    }
+
     public void ClearReceived()
     {
         Received.Clear();

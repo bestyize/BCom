@@ -202,6 +202,7 @@ public sealed class MainWindow : Window
         _monitor.ImportFileRequested += () => _ = OpenTextFileAsync();
         _monitor.ExportReceiveRequested += () => _ = SaveReceivedAsync();
         _monitor.SendFileRequested += () => _ = SendBinaryFileAsync();
+        _monitor.RunMacroRequested += () => _ = RunMacroFromComposerAsync();
         _monitor.HexDisplayToggled += _ => RenderReceived();
         _monitor.TimelineDisplayToggled += _ => RenderReceived();
 
@@ -614,6 +615,22 @@ public sealed class MainWindow : Window
         {
             await MacDialog.ShowAlertAsync(this, I18n.Format("ErrorFile", ex.Message));
         }
+    }
+
+    private async Task RunMacroFromComposerAsync()
+    {
+        var session = _sessions.Active;
+        if (session?.IsOpen != true)
+        { await MacDialog.ShowAlertAsync(this, I18n.T("ErrorNotOpen")); return; }
+        try
+        {
+            var steps = SerialMacroScript.Parse(_monitor.SendText, _monitor.TextEncoding, _monitor.LineEnding);
+            var (ok, error) = await session.RunMacroAsync(steps);
+            if (!ok) await MacDialog.ShowAlertAsync(this, error ?? "Macro failed.");
+            else SetStatusRaw("Macro completed.");
+            UpdateCounts();
+        }
+        catch (FormatException ex) { await MacDialog.ShowAlertAsync(this, ex.Message); }
     }
 
     private async Task SendBinaryFileAsync()

@@ -74,6 +74,7 @@ public sealed class MonitorView
     public event Action? ClearReceiveRequested;
     public event Action? ImportFileRequested;
     public event Action? SendFileRequested;
+    public event Action? RunMacroRequested;
     public event Action? ExportReceiveRequested;
     public event Action<bool>? HexDisplayToggled;
     public event Action<bool>? TimelineDisplayToggled;
@@ -439,6 +440,7 @@ public sealed class MonitorView
         quickRow.Children.Add(_quickCommands);
         quickRow.Children.Add(MacTheme.CreateSecondaryButton("Save command", () => RememberCommand(SendText)));
         quickRow.Children.Add(MacTheme.CreateSecondaryButton("Run", RunQuickCommand));
+        quickRow.Children.Add(MacTheme.CreateSecondaryButton("Run macro", () => RunMacroRequested?.Invoke()));
         Grid.SetRow(quickRow, 1);
         sendGrid.Children.Add(quickRow);
         Grid.SetRow(_input, 2);
