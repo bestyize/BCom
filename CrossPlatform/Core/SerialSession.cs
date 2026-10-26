@@ -25,7 +25,8 @@ public sealed class SerialSession : IDisposable
             StopBits = config.StopBits,
             Parity = config.Parity,
             RtsEnable = config.RtsEnable,
-            DtrEnable = config.DtrEnable
+            DtrEnable = config.DtrEnable,
+            Handshake = config.Handshake
         };
         Service = service ?? new SerialService();
         Service.DataReceived += OnReceived;
@@ -72,6 +73,10 @@ public sealed class SerialSession : IDisposable
     public string Draft { get; set; } = "";
     public bool SendHex { get; set; }
     public bool AppendNewLine { get; set; }
+    public SerialLineEnding LineEnding { get; set; } = SerialLineEnding.None;
+    public SerialTextEncoding TextEncoding { get; set; } = SerialTextEncoding.Utf8;
+    public bool AutoReconnect { get; set; } = true;
+    public ReconnectBackoff Reconnect { get; } = new();
     public bool ShowHex { get; set; }
     public bool ShowTimeline { get; set; }
     public bool PlotEnabled { get; set; }
@@ -86,10 +91,21 @@ public sealed class SerialSession : IDisposable
     public event Action<SerialSession, bool>? ConnectionChanged;
     public event Action<SerialSession, string>? ErrorOccurred;
 
+    public bool TryReconnect(DateTimeOffset now, out string? error)
+    {
+        error = null;
+        if (_disposed || IsOpen || !AutoReconnect || !Reconnect.IsDue(now)) return false;
+        bool success = Service.Open(Config, out error);
+        if (success) Reconnect.Reset(); else Reconnect.Failed(now);
+        return success;
+    }
+
     public bool Open(out string? error)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(SerialSession));
-        return Service.Open(Config, out error);
+        bool opened = Service.Open(Config, out error);
+        if (opened) Reconnect.Reset();
+        return opened;
     }
 
     public void StartScanning()
@@ -118,7 +134,7 @@ public sealed class SerialSession : IDisposable
         if (_disposed || !Service.IsOpen) return (false, I18n.T("ErrorNotOpen"));
         // Drop overlapping periodic ticks instead of queuing unlimited writes.
         if (_sending) return (false, null);
-        if (!SerialDataConverter.PreparePayload(Draft, SendHex, AppendNewLine,
+        if (!SerialDataConverter.PreparePayload(Draft, SendHex, LineEnding, TextEncoding,
             out var payload, out var conversionError))
             return (false, conversionError);
 
@@ -174,7 +190,7 @@ public sealed class SerialSession : IDisposable
     private void OnConnectionChanged(bool connected, string _)
     {
         if (_disposed) return;
-        if (!connected) StopRepeat();
+        if (!connected) { StopRepeat(); Reconnect.Failed(DateTimeOffset.UtcNow); }
         ConnectionChanged?.Invoke(this, connected);
     }
 

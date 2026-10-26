@@ -40,6 +40,8 @@ public static class SerialProfileStore
                         profile.RtsEnable = rts; break;
                     case "dtr" when bool.TryParse(value, out var dtr):
                         profile.DtrEnable = dtr; break;
+                    case "handshake" when Enum.TryParse<Handshake>(value, out var flow) && Enum.IsDefined(flow):
+                        profile.Handshake = flow; break;
                 }
             }
             return profile;
@@ -61,7 +63,8 @@ public static class SerialProfileStore
                 $"stop={config.StopBits}",
                 $"parity={config.Parity}",
                 $"rts={config.RtsEnable}",
-                $"dtr={config.DtrEnable}"
+                $"dtr={config.DtrEnable}",
+                $"handshake={config.Handshake}"
             });
         }
         catch (IOException) { /* Read-only user profile: keep running. */ }

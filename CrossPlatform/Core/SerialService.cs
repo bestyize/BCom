@@ -108,6 +108,7 @@ public sealed class SerialService : IDisposable
                 Encoding = System.Text.Encoding.UTF8,
                 RtsEnable = config.RtsEnable,
                 DtrEnable = config.DtrEnable,
+                Handshake = config.Handshake,
                 WriteTimeout = 1500,
                 ReadTimeout = 1500
             };
@@ -161,6 +162,13 @@ public sealed class SerialService : IDisposable
         }
 
         ConnectionChanged?.Invoke(false, string.Empty);
+    }
+
+    public (bool Cts, bool Dsr, bool Carrier)? LineStatus()
+    {
+        try { var port = _port; return port?.IsOpen == true ?
+            (port.CtsHolding, port.DsrHolding, port.CDHolding) : null; }
+        catch (Exception) { return null; }
     }
 
     public void SetSignals(bool rts, bool dtr)

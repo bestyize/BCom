@@ -7,9 +7,21 @@ namespace BCom.CrossPlatform;
 /// <summary>
 /// Data encoding, decoding and hexadecimal conversion utilities.
 /// </summary>
+public enum SerialTextEncoding { Utf8, Ascii, Latin1, Gbk }
+public enum SerialLineEnding { None, Cr, Lf, CrLf }
+
 public static class SerialDataConverter
 {
     private static readonly byte[] CrLf = { 13, 10 };
+    static SerialDataConverter() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    public static Encoding GetEncoding(SerialTextEncoding mode) => mode switch
+    {
+        SerialTextEncoding.Ascii => Encoding.ASCII,
+        SerialTextEncoding.Latin1 => Encoding.Latin1,
+        SerialTextEncoding.Gbk => Encoding.GetEncoding(936),
+        _ => Encoding.UTF8
+    };
+    public static string ToTextString(byte[] bytes, SerialTextEncoding mode) => GetEncoding(mode).GetString(bytes);
 
     /// <summary>
     /// Formats a byte buffer into space-separated hexadecimal string representation (e.g. "0A FF 12").
@@ -61,6 +73,14 @@ public static class SerialDataConverter
     public static bool PreparePayload(string? input, bool isHex, bool appendNewLine, out byte[] payload, out string? errorMessage)
     {
         errorMessage = null;
+        return PreparePayload(input, isHex, appendNewLine ? SerialLineEnding.CrLf : SerialLineEnding.None,
+            SerialTextEncoding.Utf8, out payload, out errorMessage);
+    }
+
+    public static bool PreparePayload(string? input, bool isHex, SerialLineEnding ending,
+        SerialTextEncoding encoding, out byte[] payload, out string? errorMessage)
+    {
+        errorMessage = null;
         if (isHex)
         {
             if (!TryParseHex(input, out payload))
@@ -71,13 +91,17 @@ public static class SerialDataConverter
         }
         else
         {
-            payload = Encoding.UTF8.GetBytes(input ?? string.Empty);
+            payload = GetEncoding(encoding).GetBytes(input ?? string.Empty);
         }
 
-        if (appendNewLine)
+        byte[] suffix = ending switch
         {
-            payload = payload.Concat(CrLf).ToArray();
-        }
+            SerialLineEnding.Cr => new byte[] { 13 },
+            SerialLineEnding.Lf => new byte[] { 10 },
+            SerialLineEnding.CrLf => CrLf,
+            _ => Array.Empty<byte>()
+        };
+        if (suffix.Length > 0) payload = payload.Concat(suffix).ToArray();
 
         return true;
     }
