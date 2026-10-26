@@ -320,21 +320,20 @@ public sealed class SerialService : IDisposable
         try
         {
             if (sender is not SerialPort port || !port.IsOpen) return;
-            int length = Math.Min(port.BytesToRead, 64 * 1024);
-            if (length <= 0) return;
-
-            byte[] buffer = new byte[length];
-            int read = port.Read(buffer, 0, length);
-            if (read <= 0) return;
-
-            if (read < length)
+            // Drain every available byte in bounded chunks. Reading only 64 KiB once
+            // can strand remaining bytes if a driver does not raise another callback.
+            while (port.IsOpen && ReferenceEquals(port, _port))
             {
-                Array.Resize(ref buffer, read);
+                int length = Math.Min(port.BytesToRead, 64 * 1024);
+                if (length <= 0) break;
+                byte[] buffer = new byte[length];
+                int read = port.Read(buffer, 0, length);
+                if (read <= 0) break;
+                if (read < length) Array.Resize(ref buffer, read);
+                if (!ReferenceEquals(port, _port)) break;
+                RawDataReceived?.Invoke(DateTimeOffset.UtcNow, buffer);
+                QueueForDisplay(buffer);
             }
-
-            if (!ReferenceEquals(port, _port)) return;
-            RawDataReceived?.Invoke(DateTimeOffset.UtcNow, buffer);
-            QueueForDisplay(buffer);
         }
         catch (Exception ex)
         {
