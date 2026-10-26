@@ -116,6 +116,17 @@ internal static class I18n
         ["ReceivePlaceholder"] = "Incoming serial data will appear here...",
         ["SendPlaceholder"] = "Type or paste the data to send...",
         ["PlatformWindowsOnly"] = "This utility is only available on Windows.",
+        ["FlowControl"] = "Flow control",
+        ["AutoReconnect"] = "Auto reconnect",
+        ["ProfileName"] = "Profile name",
+        ["DeviceProfiles"] = "Device profiles",
+        ["SaveProfile"] = "Save profile",
+        ["DeleteProfile"] = "Delete",
+        ["SaveCommand"] = "Save command",
+        ["RunCommand"] = "Run",
+        ["RunMacro"] = "Run macro",
+        ["MacroComplete"] = "Macro completed",
+        ["SendBinaryFile"] = "Send binary file",
         ["NotSupported"] = "This feature is not available on this system."
     };
 
@@ -224,6 +235,17 @@ internal static class I18n
         ["ReceivePlaceholder"] = "这里显示接收到的串口数据…",
         ["SendPlaceholder"] = "在此输入或粘贴要发送的数据…",
         ["PlatformWindowsOnly"] = "此工具仅支持 Windows 系统。",
+        ["FlowControl"] = "流控模式",
+        ["AutoReconnect"] = "断线自动重连",
+        ["ProfileName"] = "配置名称",
+        ["DeviceProfiles"] = "设备配置",
+        ["SaveProfile"] = "保存配置",
+        ["DeleteProfile"] = "删除",
+        ["SaveCommand"] = "保存指令",
+        ["RunCommand"] = "运行",
+        ["RunMacro"] = "运行宏",
+        ["MacroComplete"] = "宏执行完成",
+        ["SendBinaryFile"] = "发送二进制文件",
         ["NotSupported"] = "当前系统不支持此功能。"
     };
 

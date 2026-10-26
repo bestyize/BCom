@@ -19,4 +19,5 @@ public sealed class SerialConfig
     public Parity Parity { get; set; } = Parity.None;
     public bool RtsEnable { get; set; }
     public bool DtrEnable { get; set; }
+    public Handshake Handshake { get; set; } = Handshake.None;
 }

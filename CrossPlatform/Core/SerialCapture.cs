@@ -49,7 +49,7 @@ public sealed class SerialCapture : IAsyncDisposable
 
     public long DroppedBytes => Interlocked.Read(ref _droppedBytes);
     public long WrittenBytes => Interlocked.Read(ref _writtenBytes);
-    public Exception? WriteError => _writeError;
+    public Exception? WriteError => Volatile.Read(ref _writeError);
 
     public bool TryRecord(DateTimeOffset timestamp, SerialTraceDirection direction, byte[] data)
     {
@@ -86,7 +86,10 @@ public sealed class SerialCapture : IAsyncDisposable
                     string file = part == 0 ? _path : _path + ".part" + part.ToString("D3");
                     part++;
                     Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(file))!);
-                    stream = new FileStream(file, FileMode.CreateNew, FileAccess.Write,
+                    // Some native Save dialogs create an empty destination file before returning.
+                    var mode = part == 1 && File.Exists(file) && new FileInfo(file).Length == 0
+                        ? FileMode.Create : FileMode.CreateNew;
+                    stream = new FileStream(file, mode, FileAccess.Write,
                         FileShare.Read, bufferSize: 64 * 1024, useAsync: true);
                     var port = Encoding.UTF8.GetBytes(_port);
                     var header = new byte[10 + port.Length];

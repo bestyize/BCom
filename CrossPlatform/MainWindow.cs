@@ -26,8 +26,9 @@ public sealed class MainWindow : Window
     private readonly Button _captureButton = new() { MinHeight = 30 };
     private bool _updatingPicker;
     private SerialSession? _displayedSession;
-    private readonly DispatcherTimer _receiveRenderTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
+    private readonly DispatcherTimer _receiveRenderTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private bool _receiveDirty;
+    private readonly DispatcherTimer _reconnectTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly TopNavBar _topNav = new();
     private readonly MonitorView _monitor = new();
     private readonly SettingsPanel _settings = new();
@@ -43,6 +44,9 @@ public sealed class MainWindow : Window
     private string _statusKey = "StatusReady";
     private object[] _statusArguments = Array.Empty<object>();
     private bool _compact;
+    private bool _shutdownCaptureStarted;
+    private bool _shutdownCaptureComplete;
+    private readonly HashSet<SerialSession> _captureErrorsInProgress = new();
 
     public MainWindow()
     {
@@ -57,10 +61,13 @@ public sealed class MainWindow : Window
         WireEvents();
 
         _receiveRenderTimer.Tick += (_, _) => { if (_receiveDirty) RenderReceived(); };
-        Opened += (_, _) => { _receiveRenderTimer.Start(); _portScanner.StartPortScanning(); };
+        _reconnectTimer.Tick += (_, _) => { TryReconnectSessions(); _ = CheckCaptureErrorsAsync(); };
+        Closing += HandleWindowClosing;
+        Opened += (_, _) => { _receiveRenderTimer.Start(); _portScanner.StartPortScanning(); _reconnectTimer.Start(); };
         Closed += (_, _) =>
         {
             _receiveRenderTimer.Stop();
+            _reconnectTimer.Stop();
             _sessions.Dispose();
             _portScanner.Dispose();
         };
@@ -194,6 +201,8 @@ public sealed class MainWindow : Window
         _monitor.ClearReceiveRequested += HandleClearReceived;
         _monitor.ImportFileRequested += () => _ = OpenTextFileAsync();
         _monitor.ExportReceiveRequested += () => _ = SaveReceivedAsync();
+        _monitor.SendFileRequested += () => _ = SendBinaryFileAsync();
+        _monitor.RunMacroRequested += () => _ = RunMacroFromComposerAsync();
         _monitor.HexDisplayToggled += _ => RenderReceived();
         _monitor.TimelineDisplayToggled += _ => RenderReceived();
 
@@ -208,6 +217,7 @@ public sealed class MainWindow : Window
                 session.SetSignals(rts, dtr);
         };
         _settings.PeriodicChanged += HandlePeriodicChanged;
+        _settings.AutoReconnectChanged += enabled => { if (_sessions.Active is { } session) session.AutoReconnect = enabled; };
 
         _portScanner.ErrorOccurred += SetStatusRaw;
         _portScanner.PortsScanned += ports =>
@@ -332,6 +342,7 @@ public sealed class MainWindow : Window
             session.Changed += OnSessionChanged;
             session.ConnectionChanged += OnSessionConnectionChanged;
             session.ErrorOccurred += OnSessionError;
+            session.AutoReconnect = _settings.AutoReconnectEnabled;
             SerialProfileStore.Save(config);
             SetStatus("StatusOpen", config.PortName);
             RefreshSessionPicker();
@@ -340,6 +351,74 @@ public sealed class MainWindow : Window
         else if (error != null)
         {
             _ = MacDialog.ShowAlertAsync(this, error);
+        }
+    }
+
+    private void TryReconnectSessions()
+    {
+        var available = _portScanner.GetAvailablePorts();
+        foreach (var session in _sessions.Sessions.ToArray())
+        {
+            session.Service.CheckPorts();
+            if (session.IsOpen || !session.AutoReconnect ||
+                !available.Contains(session.Config.PortName, StringComparer.OrdinalIgnoreCase))
+                continue;
+            if (session.TryReconnect(DateTimeOffset.UtcNow, out _))
+            {
+                if (ReferenceEquals(session, _sessions.Active))
+                    SetStatus("StatusOpen", session.Config.PortName);
+                RefreshSessionPicker();
+            }
+        }
+    }
+
+    private async Task CheckCaptureErrorsAsync()
+    {
+        foreach (var session in _sessions.Sessions.ToArray())
+        {
+            var error = session.CaptureWriteError;
+            if (error == null || !_captureErrorsInProgress.Add(session)) continue;
+            try
+            {
+                try { await session.StopRecordingAsync(); }
+                catch (Exception ex) { error = ex; }
+                SetStatusRaw("Capture write failed: " + error.Message);
+                if (ReferenceEquals(session, _sessions.Active))
+                    await MacDialog.ShowAlertAsync(this, "Capture stopped: " + error.Message);
+                UpdateCaptureButton();
+            }
+            finally { _captureErrorsInProgress.Remove(session); }
+        }
+    }
+
+    private void HandleWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_shutdownCaptureComplete) return;
+        if (_sessions.Sessions.All(s => !s.IsRecording)) return;
+        e.Cancel = true;
+        if (!_shutdownCaptureStarted)
+        {
+            _shutdownCaptureStarted = true;
+            _ = FlushRecordingsAndCloseAsync();
+        }
+    }
+
+    private async Task FlushRecordingsAndCloseAsync()
+    {
+        try
+        {
+            foreach (var session in _sessions.Sessions.ToArray())
+                if (session.IsRecording)
+                    await session.StopRecordingAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        catch (Exception ex)
+        {
+            SetStatusRaw("Recording flush failed: " + ex.Message);
+        }
+        finally
+        {
+            _shutdownCaptureComplete = true;
+            Close();
         }
     }
 
@@ -375,7 +454,7 @@ public sealed class MainWindow : Window
         _displayedSession = session;
         _monitor.ApplySession(session);
         if (session != null)
-            _settings.ApplySession(session.Config, session.RepeatEnabled, session.RepeatIntervalMs);
+            _settings.ApplySession(session.Config, session.RepeatEnabled, session.RepeatIntervalMs, session.AutoReconnect);
         else
             _settings.ResetPeriodic();
 
@@ -414,7 +493,7 @@ public sealed class MainWindow : Window
                 ? SerialTraceFormatter.Format(session.Trace)
                 : _monitor.IsShowHex
                     ? SerialDataConverter.ToHexString(bytes)
-                    : SerialDataConverter.ToUtf8String(bytes);
+                    : SerialDataConverter.ToTextString(bytes, session.TextEncoding);
         _monitor.UpdatePlot(session?.Telemetry);
         UpdateCounts();
     }
@@ -433,7 +512,7 @@ public sealed class MainWindow : Window
         if (!success && error != null && ReferenceEquals(session, _sessions.Active))
             _ = MacDialog.ShowAlertAsync(this, error);
         if (success && ReferenceEquals(session, _sessions.Active))
-            UpdateCounts();
+        { _monitor.RememberCommand(session.Draft); UpdateCounts(); }
     }
 
     private void HandleClearReceived()
@@ -536,6 +615,42 @@ public sealed class MainWindow : Window
         {
             await MacDialog.ShowAlertAsync(this, I18n.Format("ErrorFile", ex.Message));
         }
+    }
+
+    private async Task RunMacroFromComposerAsync()
+    {
+        var session = _sessions.Active;
+        if (session?.IsOpen != true)
+        { await MacDialog.ShowAlertAsync(this, I18n.T("ErrorNotOpen")); return; }
+        try
+        {
+            var steps = SerialMacroScript.Parse(_monitor.SendText, _monitor.TextEncoding, _monitor.LineEnding);
+            var (ok, error) = await session.RunMacroAsync(steps);
+            if (!ok) await MacDialog.ShowAlertAsync(this, error ?? "Macro failed.");
+            else SetStatusRaw(I18n.T("MacroComplete"));
+            UpdateCounts();
+        }
+        catch (FormatException ex) { await MacDialog.ShowAlertAsync(this, ex.Message); }
+    }
+
+    private async Task SendBinaryFileAsync()
+    {
+        var session = _sessions.Active;
+        if (session?.IsOpen != true) { await MacDialog.ShowAlertAsync(this, I18n.T("ErrorNotOpen")); return; }
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                AllowMultiple = false,
+                Title = I18n.T("SendBinaryFile")
+            });
+            if (files.Count == 0) return;
+            await using var data = await files[0].OpenReadAsync();
+            var (success, error) = await session.SendStreamAsync(data);
+            if (!success) await MacDialog.ShowAlertAsync(this, error ?? "Transfer failed.");
+            UpdateCounts();
+        }
+        catch (Exception ex) { await MacDialog.ShowAlertAsync(this, ex.Message); }
     }
 
     private async Task SaveReceivedAsync()

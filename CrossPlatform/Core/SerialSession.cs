@@ -25,7 +25,8 @@ public sealed class SerialSession : IDisposable
             StopBits = config.StopBits,
             Parity = config.Parity,
             RtsEnable = config.RtsEnable,
-            DtrEnable = config.DtrEnable
+            DtrEnable = config.DtrEnable,
+            Handshake = config.Handshake
         };
         Service = service ?? new SerialService();
         Service.DataReceived += OnReceived;
@@ -41,6 +42,7 @@ public sealed class SerialSession : IDisposable
     public TelemetryBuffer Telemetry { get; } = new();
     public long SentBytes { get; private set; }
     public bool IsRecording => System.Threading.Volatile.Read(ref _capture) != null;
+    public Exception? CaptureWriteError => System.Threading.Volatile.Read(ref _capture)?.WriteError;
     public long CaptureDroppedBytes => System.Threading.Volatile.Read(ref _capture)?.DroppedBytes ??
         System.Threading.Interlocked.Read(ref _lastCaptureDroppedBytes);
     public long UiDroppedBytes => Service.DroppedDisplayBytes;
@@ -72,6 +74,10 @@ public sealed class SerialSession : IDisposable
     public string Draft { get; set; } = "";
     public bool SendHex { get; set; }
     public bool AppendNewLine { get; set; }
+    public SerialLineEnding LineEnding { get; set; } = SerialLineEnding.None;
+    public SerialTextEncoding TextEncoding { get; set; } = SerialTextEncoding.Utf8;
+    public bool AutoReconnect { get; set; } = true;
+    public ReconnectBackoff Reconnect { get; } = new();
     public bool ShowHex { get; set; }
     public bool ShowTimeline { get; set; }
     public bool PlotEnabled { get; set; }
@@ -86,10 +92,21 @@ public sealed class SerialSession : IDisposable
     public event Action<SerialSession, bool>? ConnectionChanged;
     public event Action<SerialSession, string>? ErrorOccurred;
 
+    public bool TryReconnect(DateTimeOffset now, out string? error)
+    {
+        error = null;
+        if (_disposed || IsOpen || !AutoReconnect || !Reconnect.IsDue(now)) return false;
+        bool success = Service.Open(Config, out error);
+        if (success) Reconnect.Reset(); else Reconnect.Failed(now);
+        return success;
+    }
+
     public bool Open(out string? error)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(SerialSession));
-        return Service.Open(Config, out error);
+        bool opened = Service.Open(Config, out error);
+        if (opened) Reconnect.Reset();
+        return opened;
     }
 
     public void StartScanning()
@@ -118,7 +135,7 @@ public sealed class SerialSession : IDisposable
         if (_disposed || !Service.IsOpen) return (false, I18n.T("ErrorNotOpen"));
         // Drop overlapping periodic ticks instead of queuing unlimited writes.
         if (_sending) return (false, null);
-        if (!SerialDataConverter.PreparePayload(Draft, SendHex, AppendNewLine,
+        if (!SerialDataConverter.PreparePayload(Draft, SendHex, LineEnding, TextEncoding,
             out var payload, out var conversionError))
             return (false, conversionError);
 
@@ -140,6 +157,67 @@ public sealed class SerialSession : IDisposable
         {
             _sending = false;
         }
+    }
+
+    /// <summary>Transmit a binary stream in 4 KiB segments, retaining accurate TX events.</summary>
+    public async Task<(bool Success, string? Error)> SendStreamAsync(System.IO.Stream input, CancellationToken token = default)
+    {
+        if (_disposed || !Service.IsOpen) return (false, I18n.T("ErrorNotOpen"));
+        if (_sending) return (false, "Another transfer is running.");
+        _sending = true;
+        try
+        {
+            var buffer = new byte[4096];
+            int count;
+            while ((count = await input.ReadAsync(buffer, token)) > 0)
+            {
+                var data = buffer.AsSpan(0, count).ToArray();
+                var (success, error) = await Service.WriteAsync(data, token);
+                if (!success) return (false, error);
+                if (_disposed) return (false, "Session closed during transfer.");
+                SentBytes += data.Length;
+                var now = DateTimeOffset.UtcNow;
+                Trace.Append(now, Config.PortName, SerialTraceDirection.Tx, data);
+                System.Threading.Volatile.Read(ref _capture)?.TryRecord(now, SerialTraceDirection.Tx, data);
+                Changed?.Invoke(this);
+            }
+            return (true, null);
+        }
+        catch (OperationCanceledException) { return (false, "Transfer cancelled."); }
+        catch (System.IO.IOException ex) { return (false, ex.Message); }
+        finally { _sending = false; }
+    }
+
+    /// <summary>Runs a bounded, explicit sequence; no retry on disconnect.</summary>
+    public async Task<(bool Success, string? Error)> RunMacroAsync(
+        System.Collections.Generic.IReadOnlyList<SerialMacroStep> steps, CancellationToken token = default)
+    {
+        if (_disposed || !Service.IsOpen) return (false, I18n.T("ErrorNotOpen"));
+        if (_sending) return (false, "Another send is in progress.");
+        _sending = true;
+        try
+        {
+            foreach (var step in steps)
+            {
+                token.ThrowIfCancellationRequested();
+                if (!IsOpen) return (false, "Port disconnected; macro stopped.");
+                if (step.Payload.Length == 0)
+                {
+                    await Task.Delay(step.WaitMilliseconds, token);
+                    continue;
+                }
+                var (ok, error) = await Service.WriteAsync(step.Payload, token);
+                if (!ok) return (false, error);
+                SentBytes += step.Payload.Length;
+                var timestamp = DateTimeOffset.UtcNow;
+                Trace.Append(timestamp, Config.PortName, SerialTraceDirection.Tx, step.Payload);
+                System.Threading.Volatile.Read(ref _capture)?.TryRecord(timestamp, SerialTraceDirection.Tx, step.Payload);
+                Changed?.Invoke(this);
+            }
+            return (true, null);
+        }
+        catch (OperationCanceledException) { return (false, "Macro cancelled."); }
+        finally { _sending = false; }
     }
 
     public void ClearReceived()
@@ -174,7 +252,7 @@ public sealed class SerialSession : IDisposable
     private void OnConnectionChanged(bool connected, string _)
     {
         if (_disposed) return;
-        if (!connected) StopRepeat();
+        if (!connected) { StopRepeat(); Reconnect.Failed(DateTimeOffset.UtcNow); }
         ConnectionChanged?.Invoke(this, connected);
     }
 
@@ -191,7 +269,12 @@ public sealed class SerialSession : IDisposable
         StopRepeat();
         _disposed = true;
         var capture = System.Threading.Interlocked.Exchange(ref _capture, null);
-        if (capture != null) capture.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        if (capture != null)
+        {
+            // UI callers should stop captures asynchronously first; bound the shutdown fallback.
+            try { capture.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3)); }
+            catch (Exception) { /* Capture errors are surfaced by the recording state monitor. */ }
+        }
         Service.RawDataReceived -= OnRawReceived;
         Service.DataReceived -= OnReceived;
         Service.ConnectionChanged -= OnConnectionChanged;

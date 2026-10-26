@@ -108,6 +108,7 @@ public sealed class SerialService : IDisposable
                 Encoding = System.Text.Encoding.UTF8,
                 RtsEnable = config.RtsEnable,
                 DtrEnable = config.DtrEnable,
+                Handshake = config.Handshake,
                 WriteTimeout = 1500,
                 ReadTimeout = 1500
             };
@@ -161,6 +162,13 @@ public sealed class SerialService : IDisposable
         }
 
         ConnectionChanged?.Invoke(false, string.Empty);
+    }
+
+    public (bool Cts, bool Dsr, bool Carrier)? LineStatus()
+    {
+        try { var port = _port; return port?.IsOpen == true ?
+            (port.CtsHolding, port.DsrHolding, port.CDHolding) : null; }
+        catch (Exception) { return null; }
     }
 
     public void SetSignals(bool rts, bool dtr)
@@ -284,7 +292,9 @@ public sealed class SerialService : IDisposable
 
     private void DrainDisplayQueue()
     {
-        while (true)
+        int processed = 0;
+        int packets = 0;
+        while (processed < 128 * 1024 && packets < 32)
         {
             byte[] next;
             lock (_receiveQueueLock)
@@ -298,7 +308,11 @@ public sealed class SerialService : IDisposable
                 _pendingReceiveBytes -= next.Length;
             }
             DataReceived?.Invoke(next);
+            processed += next.Length;
+            packets++;
         }
+        // Keep UI input responsive even under sustained high-baud serial traffic.
+        Dispatcher.UIThread.Post(DrainDisplayQueue, DispatcherPriority.Background);
     }
 
     private void OnSerialDataReceived(object? sender, SerialDataReceivedEventArgs e)
@@ -306,21 +320,20 @@ public sealed class SerialService : IDisposable
         try
         {
             if (sender is not SerialPort port || !port.IsOpen) return;
-            int length = port.BytesToRead;
-            if (length <= 0) return;
-
-            byte[] buffer = new byte[length];
-            int read = port.Read(buffer, 0, length);
-            if (read <= 0) return;
-
-            if (read < length)
+            // Drain every available byte in bounded chunks. Reading only 64 KiB once
+            // can strand remaining bytes if a driver does not raise another callback.
+            while (port.IsOpen && ReferenceEquals(port, _port))
             {
-                Array.Resize(ref buffer, read);
+                int length = Math.Min(port.BytesToRead, 64 * 1024);
+                if (length <= 0) break;
+                byte[] buffer = new byte[length];
+                int read = port.Read(buffer, 0, length);
+                if (read <= 0) break;
+                if (read < length) Array.Resize(ref buffer, read);
+                if (!ReferenceEquals(port, _port)) break;
+                RawDataReceived?.Invoke(DateTimeOffset.UtcNow, buffer);
+                QueueForDisplay(buffer);
             }
-
-            if (!ReferenceEquals(port, _port)) return;
-            RawDataReceived?.Invoke(DateTimeOffset.UtcNow, buffer);
-            QueueForDisplay(buffer);
         }
         catch (Exception ex)
         {
