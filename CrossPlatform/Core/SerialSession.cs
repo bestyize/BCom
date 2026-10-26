@@ -42,6 +42,7 @@ public sealed class SerialSession : IDisposable
     public TelemetryBuffer Telemetry { get; } = new();
     public long SentBytes { get; private set; }
     public bool IsRecording => System.Threading.Volatile.Read(ref _capture) != null;
+    public Exception? CaptureWriteError => System.Threading.Volatile.Read(ref _capture)?.WriteError;
     public long CaptureDroppedBytes => System.Threading.Volatile.Read(ref _capture)?.DroppedBytes ??
         System.Threading.Interlocked.Read(ref _lastCaptureDroppedBytes);
     public long UiDroppedBytes => Service.DroppedDisplayBytes;
@@ -158,6 +159,35 @@ public sealed class SerialSession : IDisposable
         }
     }
 
+    /// <summary>Transmit a binary stream in 4 KiB segments, retaining accurate TX events.</summary>
+    public async Task<(bool Success, string? Error)> SendStreamAsync(System.IO.Stream input, CancellationToken token = default)
+    {
+        if (_disposed || !Service.IsOpen) return (false, I18n.T("ErrorNotOpen"));
+        if (_sending) return (false, "Another transfer is running.");
+        _sending = true;
+        try
+        {
+            var buffer = new byte[4096];
+            int count;
+            while ((count = await input.ReadAsync(buffer, token)) > 0)
+            {
+                var data = buffer.AsSpan(0, count).ToArray();
+                var (success, error) = await Service.WriteAsync(data, token);
+                if (!success) return (false, error);
+                if (_disposed) return (false, "Session closed during transfer.");
+                SentBytes += data.Length;
+                var now = DateTimeOffset.UtcNow;
+                Trace.Append(now, Config.PortName, SerialTraceDirection.Tx, data);
+                System.Threading.Volatile.Read(ref _capture)?.TryRecord(now, SerialTraceDirection.Tx, data);
+                Changed?.Invoke(this);
+            }
+            return (true, null);
+        }
+        catch (OperationCanceledException) { return (false, "Transfer cancelled."); }
+        catch (System.IO.IOException ex) { return (false, ex.Message); }
+        finally { _sending = false; }
+    }
+
     public void ClearReceived()
     {
         Received.Clear();
@@ -207,7 +237,12 @@ public sealed class SerialSession : IDisposable
         StopRepeat();
         _disposed = true;
         var capture = System.Threading.Interlocked.Exchange(ref _capture, null);
-        if (capture != null) capture.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        if (capture != null)
+        {
+            // UI callers should stop captures asynchronously first; bound the shutdown fallback.
+            try { capture.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3)); }
+            catch (Exception) { /* Capture errors are surfaced by the recording state monitor. */ }
+        }
         Service.RawDataReceived -= OnRawReceived;
         Service.DataReceived -= OnReceived;
         Service.ConnectionChanged -= OnConnectionChanged;

@@ -292,7 +292,9 @@ public sealed class SerialService : IDisposable
 
     private void DrainDisplayQueue()
     {
-        while (true)
+        int processed = 0;
+        int packets = 0;
+        while (processed < 128 * 1024 && packets < 32)
         {
             byte[] next;
             lock (_receiveQueueLock)
@@ -306,7 +308,11 @@ public sealed class SerialService : IDisposable
                 _pendingReceiveBytes -= next.Length;
             }
             DataReceived?.Invoke(next);
+            processed += next.Length;
+            packets++;
         }
+        // Keep UI input responsive even under sustained high-baud serial traffic.
+        Dispatcher.UIThread.Post(DrainDisplayQueue, DispatcherPriority.Background);
     }
 
     private void OnSerialDataReceived(object? sender, SerialDataReceivedEventArgs e)
@@ -314,7 +320,7 @@ public sealed class SerialService : IDisposable
         try
         {
             if (sender is not SerialPort port || !port.IsOpen) return;
-            int length = port.BytesToRead;
+            int length = Math.Min(port.BytesToRead, 64 * 1024);
             if (length <= 0) return;
 
             byte[] buffer = new byte[length];

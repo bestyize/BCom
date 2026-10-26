@@ -73,6 +73,7 @@ public sealed class MonitorView
     public event Action? ClearSendRequested;
     public event Action? ClearReceiveRequested;
     public event Action? ImportFileRequested;
+    public event Action? SendFileRequested;
     public event Action? ExportReceiveRequested;
     public event Action<bool>? HexDisplayToggled;
     public event Action<bool>? TimelineDisplayToggled;
@@ -100,6 +101,7 @@ public sealed class MonitorView
         get => _output.Text ?? string.Empty;
         set
         {
+            if (string.Equals(_output.Text, value, StringComparison.Ordinal)) return;
             _output.Text = value;
             if (_followTail.IsChecked == true)
                 _output.CaretIndex = value?.Length ?? 0;
@@ -427,6 +429,7 @@ public sealed class MonitorView
         _importSendBtn = MacTheme.CreateSecondaryButton(I18n.T("Import"), () => ImportFileRequested?.Invoke());
         _clearSendBtn = MacTheme.CreateSecondaryButton(I18n.T("ClearSend"), () => ClearSendRequested?.Invoke());
         sendHeaderActions.Children.Add(_importSendBtn);
+        sendHeaderActions.Children.Add(MacTheme.CreateSecondaryButton("Send file", () => SendFileRequested?.Invoke()));
         sendHeaderActions.Children.Add(_clearSendBtn);
         Grid.SetColumn(sendHeaderActions, 3);
         sendHeaderGrid.Children.Add(sendHeaderActions);
