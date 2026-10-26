@@ -25,9 +25,13 @@ public sealed class SettingsPanel
     private readonly ComboBox _stopBits = new();
     private readonly ComboBox _parities = new();
     private readonly ComboBox _flow = new();
-    private readonly CheckBox _autoReconnect = new() { IsChecked = true, Content = "Auto reconnect" };
+    private readonly CheckBox _autoReconnect = new() { IsChecked = true, Content = I18n.T("AutoReconnect") };
     private readonly ComboBox _presets = new();
-    private readonly TextBox _presetName = new() { PlaceholderText = "Profile name" };
+    private readonly TextBox _presetName = new() { PlaceholderText = I18n.T("ProfileName") };
+    private TextBlock? _flowLabel;
+    private TextBlock? _presetLabel;
+    private Button? _savePresetButton;
+    private Button? _deletePresetButton;
 
     private readonly Button _openButton = new()
     {
@@ -290,6 +294,12 @@ public sealed class SettingsPanel
         _rts.Content = I18n.T("Rts");
         _dtr.Content = I18n.T("Dtr");
         _periodic.Content = I18n.T("AutoRepeat");
+        _autoReconnect.Content = I18n.T("AutoReconnect");
+        _presetName.PlaceholderText = I18n.T("ProfileName");
+        if (_flowLabel != null) _flowLabel.Text = I18n.T("FlowControl");
+        if (_presetLabel != null) _presetLabel.Text = I18n.T("DeviceProfiles");
+        if (_savePresetButton != null) _savePresetButton.Content = I18n.T("SaveProfile");
+        if (_deletePresetButton != null) _deletePresetButton.Content = I18n.T("DeleteProfile");
     }
 
     public void ApplyTheme()
@@ -395,17 +405,21 @@ public sealed class SettingsPanel
         _parityLabel = MacTheme.CreateFormLabel(I18n.T("Parity"));
         stack.Children.Add(_parityLabel);
         stack.Children.Add(_parities);
-        stack.Children.Add(MacTheme.CreateFormLabel("Flow control"));
+        _flowLabel = MacTheme.CreateFormLabel(I18n.T("FlowControl"));
+        stack.Children.Add(_flowLabel);
         stack.Children.Add(_flow);
         stack.Children.Add(_autoReconnect);
 
         stack.Children.Add(_openButton);
-        stack.Children.Add(MacTheme.CreateFormLabel("Device profiles"));
+        _presetLabel = MacTheme.CreateFormLabel(I18n.T("DeviceProfiles"));
+        stack.Children.Add(_presetLabel);
         stack.Children.Add(_presets);
         stack.Children.Add(_presetName);
         var profileRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-        profileRow.Children.Add(MacTheme.CreateSecondaryButton("Save profile", SavePreset));
-        profileRow.Children.Add(MacTheme.CreateSecondaryButton("Delete", DeletePreset));
+        _savePresetButton = MacTheme.CreateSecondaryButton(I18n.T("SaveProfile"), SavePreset);
+        _deletePresetButton = MacTheme.CreateSecondaryButton(I18n.T("DeleteProfile"), DeletePreset);
+        profileRow.Children.Add(_savePresetButton);
+        profileRow.Children.Add(_deletePresetButton);
         stack.Children.Add(profileRow);
 
         _signalsTitle = new TextBlock

@@ -51,6 +51,10 @@ public sealed class MonitorView
     private readonly ComboBox _newline = new() { Width = 78, Height = 29 };
     private readonly ComboBox _encoding = new() { Width = 82, Height = 29 };
     private readonly ComboBox _quickCommands = new() { MinWidth = 160, MaxWidth = 280, Height = 29 };
+    private Button? _saveQuickButton;
+    private Button? _runQuickButton;
+    private Button? _runMacroButton;
+    private Button? _sendFileButton;
 
     private readonly TextBlock _rxCountBadge = new() { FontSize = 11.5, FontWeight = FontWeight.SemiBold };
     private readonly TextBlock _txCountBadge = new() { FontSize = 11.5, FontWeight = FontWeight.SemiBold };
@@ -222,6 +226,10 @@ public sealed class MonitorView
         _showHex.Content = I18n.T("HexDisplay");
         _sendHex.Content = I18n.T("HexSend");
         // Line-ending control uses a fixed protocol notation (CR/LF/CRLF).
+        if (_saveQuickButton != null) _saveQuickButton.Content = I18n.T("SaveCommand");
+        if (_runQuickButton != null) _runQuickButton.Content = I18n.T("RunCommand");
+        if (_runMacroButton != null) _runMacroButton.Content = I18n.T("RunMacro");
+        if (_sendFileButton != null) _sendFileButton.Content = I18n.T("SendBinaryFile");
         _output.PlaceholderText = I18n.T("ReceivePlaceholder");
         _input.PlaceholderText = I18n.T("SendPlaceholder");
     }
@@ -430,7 +438,8 @@ public sealed class MonitorView
         _importSendBtn = MacTheme.CreateSecondaryButton(I18n.T("Import"), () => ImportFileRequested?.Invoke());
         _clearSendBtn = MacTheme.CreateSecondaryButton(I18n.T("ClearSend"), () => ClearSendRequested?.Invoke());
         sendHeaderActions.Children.Add(_importSendBtn);
-        sendHeaderActions.Children.Add(MacTheme.CreateSecondaryButton("Send file", () => SendFileRequested?.Invoke()));
+        _sendFileButton = MacTheme.CreateSecondaryButton(I18n.T("SendBinaryFile"), () => SendFileRequested?.Invoke());
+        sendHeaderActions.Children.Add(_sendFileButton);
         sendHeaderActions.Children.Add(_clearSendBtn);
         Grid.SetColumn(sendHeaderActions, 3);
         sendHeaderGrid.Children.Add(sendHeaderActions);
@@ -438,9 +447,12 @@ public sealed class MonitorView
 
         var quickRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7 };
         quickRow.Children.Add(_quickCommands);
-        quickRow.Children.Add(MacTheme.CreateSecondaryButton("Save command", () => RememberCommand(SendText)));
-        quickRow.Children.Add(MacTheme.CreateSecondaryButton("Run", RunQuickCommand));
-        quickRow.Children.Add(MacTheme.CreateSecondaryButton("Run macro", () => RunMacroRequested?.Invoke()));
+        _saveQuickButton = MacTheme.CreateSecondaryButton(I18n.T("SaveCommand"), () => RememberCommand(SendText));
+        _runQuickButton = MacTheme.CreateSecondaryButton(I18n.T("RunCommand"), RunQuickCommand);
+        _runMacroButton = MacTheme.CreateSecondaryButton(I18n.T("RunMacro"), () => RunMacroRequested?.Invoke());
+        quickRow.Children.Add(_saveQuickButton);
+        quickRow.Children.Add(_runQuickButton);
+        quickRow.Children.Add(_runMacroButton);
         Grid.SetRow(quickRow, 1);
         sendGrid.Children.Add(quickRow);
         Grid.SetRow(_input, 2);

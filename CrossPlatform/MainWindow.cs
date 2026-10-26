@@ -627,7 +627,7 @@ public sealed class MainWindow : Window
             var steps = SerialMacroScript.Parse(_monitor.SendText, _monitor.TextEncoding, _monitor.LineEnding);
             var (ok, error) = await session.RunMacroAsync(steps);
             if (!ok) await MacDialog.ShowAlertAsync(this, error ?? "Macro failed.");
-            else SetStatusRaw("Macro completed.");
+            else SetStatusRaw(I18n.T("MacroComplete"));
             UpdateCounts();
         }
         catch (FormatException ex) { await MacDialog.ShowAlertAsync(this, ex.Message); }
@@ -642,7 +642,7 @@ public sealed class MainWindow : Window
             var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
                 AllowMultiple = false,
-                Title = "Send binary file"
+                Title = I18n.T("SendBinaryFile")
             });
             if (files.Count == 0) return;
             await using var data = await files[0].OpenReadAsync();

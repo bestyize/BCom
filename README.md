@@ -200,6 +200,23 @@ The PTY tests do **not** validate USB serial driver compatibility, hardware
 flow control, unplug/reconnect behavior, device-specific latency or sustained
 high-baud throughput. Those still require real adapters and connected devices.
 
+
+## Professional serial workflows (stages 1–2)
+
+The desktop app adds USB auto-reconnect with bounded exponential backoff, selectable hardware/software flow control, named device profiles, UTF-8/ASCII/Latin-1/GBK character encodings, and CR/LF/CRLF/none endings. Recent successfully transmitted commands are saved locally as quick-send shortcuts; **Send binary file** streams raw bytes in 4 KiB chunks rather than loading full files into RAM.
+
+The composer can execute an explicitly triggered sequence with **Run macro**:
+
+```text
+TEXT:AT
+WAIT:200
+HEX:01 03 00 00 00 02 C4 0B
+```
+
+This intentionally restricted syntax supports no loops, shell commands or implicit retries. Macros stop on disconnect/write failure and never replay after reconnect; maximum 100 steps, 4096 bytes per send, 256 KiB payload and 120 seconds total wait. Automatic reconnection uses the serial device *path*, not an immutable hardware identity: verify that the expected adapter is attached before sending sensitive commands.
+
+Capture disk-write failures are reported in the UI. Shutdown asynchronously flushes active recordings with a 10-second ceiling, and incoming data is processed in bounded UI batches. The visible 128 KiB receive window is not a replacement for on-disk recording. Real-device tests for flow control, USB driver behavior, hotplug and long-duration high-speed throughput are still needed before production use.
+
 ## Localization
 
 The interface follows the operating system's language by default: Chinese-speaking systems use Simplified Chinese; other systems use English. Change it in the app's **Language** selector. The choice is saved in the user profile. Strings live in `CrossPlatform/I18n.cs` (English fallback and Simplified Chinese dictionary).
