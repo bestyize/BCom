@@ -24,6 +24,10 @@ public sealed class SettingsPanel
     private readonly ComboBox _dataBits = new();
     private readonly ComboBox _stopBits = new();
     private readonly ComboBox _parities = new();
+    private readonly ComboBox _flow = new();
+    private readonly CheckBox _autoReconnect = new() { IsChecked = true, Content = "Auto reconnect" };
+    private readonly ComboBox _presets = new();
+    private readonly TextBox _presetName = new() { PlaceholderText = "Profile name" };
 
     private readonly Button _openButton = new()
     {
@@ -77,6 +81,8 @@ public sealed class SettingsPanel
     public event Action? PortSelectionChanged;
     public event Action<bool, bool>? SignalsChanged;
     public event Action<bool, int>? PeriodicChanged;
+    public event Action<bool>? AutoReconnectChanged;
+    public bool AutoReconnectEnabled => _autoReconnect.IsChecked == true;
 
     public Border Container { get; }
 
@@ -87,6 +93,8 @@ public sealed class SettingsPanel
         _dataBits.ItemsSource = SerialConfig.DataBitsOptions.Select(x => x.ToString()).ToArray();
         _stopBits.ItemsSource = SerialConfig.StopBitsOptions.Select(x => x.ToString()).ToArray();
         _parities.ItemsSource = SerialConfig.ParityOptions.Select(x => x.ToString()).ToArray();
+        _flow.ItemsSource = Enum.GetValues<Handshake>().Select(x => x.ToString()).ToArray();
+        _flow.SelectedIndex = 0;
 
         _dataBits.SelectedIndex = 0;
         _stopBits.SelectedIndex = 0;
@@ -98,6 +106,7 @@ public sealed class SettingsPanel
         _dataBits.HorizontalAlignment = HorizontalAlignment.Stretch;
         _stopBits.HorizontalAlignment = HorizontalAlignment.Stretch;
         _parities.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _flow.HorizontalAlignment = HorizontalAlignment.Stretch;
 
         _ports.CornerRadius = new CornerRadius(7);
         _bauds.CornerRadius = new CornerRadius(7);
@@ -110,8 +119,12 @@ public sealed class SettingsPanel
         _rts.IsCheckedChanged += (_, _) => OnSignalsChanged();
         _dtr.IsCheckedChanged += (_, _) => OnSignalsChanged();
         _periodic.IsCheckedChanged += (_, _) => OnPeriodicChanged();
+        _autoReconnect.IsCheckedChanged += (_, _) => { if (!_applyingSession) AutoReconnectChanged?.Invoke(AutoReconnectEnabled); };
+        _flow.SelectionChanged += (_, _) => _rts.IsEnabled = _flow.SelectedIndex is 0 or 1;
+        _presets.SelectionChanged += (_, _) => ApplyPreset();
         _interval.TextChanged += (_, _) => OnPeriodicChanged();
 
+        RefreshPresets();
         Container = BuildView();
         ApplyTheme();
         RefreshLanguage();
@@ -127,7 +140,8 @@ public sealed class SettingsPanel
             StopBits = SerialConfig.StopBitsOptions[Math.Max(0, _stopBits.SelectedIndex)],
             Parity = SerialConfig.ParityOptions[Math.Max(0, _parities.SelectedIndex)],
             RtsEnable = _rts.IsChecked == true,
-            DtrEnable = _dtr.IsChecked == true
+            DtrEnable = _dtr.IsChecked == true,
+            Handshake = Enum.GetValues<Handshake>()[Math.Max(0, _flow.SelectedIndex)]
         };
     }
 
@@ -143,10 +157,11 @@ public sealed class SettingsPanel
         _parities.SelectedIndex = Math.Max(0, Array.IndexOf(SerialConfig.ParityOptions, profile.Parity));
         _rts.IsChecked = profile.RtsEnable;
         _dtr.IsChecked = profile.DtrEnable;
+        _flow.SelectedIndex = Array.IndexOf(Enum.GetValues<Handshake>(), profile.Handshake);
     }
 
     /// <summary>Restores controls for an already-open session without mutating that connection.</summary>
-    public void ApplySession(SerialConfig config, bool repeat, int intervalMs)
+    public void ApplySession(SerialConfig config, bool repeat, int intervalMs, bool autoReconnect = true)
     {
         _applyingSession = true;
         try
@@ -160,14 +175,57 @@ public sealed class SettingsPanel
             _parities.SelectedIndex = Math.Max(0, Array.IndexOf(SerialConfig.ParityOptions, config.Parity));
             _rts.IsChecked = config.RtsEnable;
             _dtr.IsChecked = config.DtrEnable;
+            _flow.SelectedIndex = Array.IndexOf(Enum.GetValues<Handshake>(), config.Handshake);
             _interval.Text = intervalMs.ToString();
             _periodic.IsChecked = repeat;
+            _autoReconnect.IsChecked = autoReconnect;
         }
         finally
         {
             _applyingSession = false;
         }
         SetConnectionState(true);
+    }
+
+    private void RefreshPresets()
+    {
+        _presets.ItemsSource = SerialPresetStore.Load().Select(x => x.Name).ToArray();
+        _presets.SelectedIndex = -1;
+    }
+    private void ApplyPreset()
+    {
+        if (_presets.SelectedItem is not string name) return;
+        var preset = SerialPresetStore.Load().FirstOrDefault(x => x.Name == name);
+        if (preset == null) return;
+        _presetName.Text = name;
+        _applyingSession = true;
+        try
+        {
+            var cfg = preset.Config;
+            _preferredPort = cfg.PortName;
+            _ports.SelectedItem = (_ports.ItemsSource as string[])?.FirstOrDefault(
+                x => string.Equals(x, cfg.PortName, StringComparison.OrdinalIgnoreCase));
+            _bauds.Text = cfg.BaudRate.ToString();
+            _dataBits.SelectedIndex = Array.IndexOf(SerialConfig.DataBitsOptions, cfg.DataBits);
+            _stopBits.SelectedIndex = Array.IndexOf(SerialConfig.StopBitsOptions, cfg.StopBits);
+            _parities.SelectedIndex = Array.IndexOf(SerialConfig.ParityOptions, cfg.Parity);
+            _flow.SelectedIndex = Array.IndexOf(Enum.GetValues<Handshake>(), cfg.Handshake);
+            _rts.IsChecked = cfg.RtsEnable; _dtr.IsChecked = cfg.DtrEnable;
+        }
+        finally { _applyingSession = false; }
+        PortSelectionChanged?.Invoke();
+    }
+    private void SavePreset()
+    {
+        try { SerialPresetStore.Save(_presetName.Text ?? "", GetConfig()); RefreshPresets(); }
+        catch (Exception) { /* Malformed name or read-only settings; serial session continues. */ }
+    }
+    private void DeletePreset()
+    {
+        if (_presets.SelectedItem is not string name) return;
+        try { SerialPresetStore.Delete(name); RefreshPresets(); }
+        catch (System.IO.IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     private int ReadBaudRate()
@@ -337,8 +395,18 @@ public sealed class SettingsPanel
         _parityLabel = MacTheme.CreateFormLabel(I18n.T("Parity"));
         stack.Children.Add(_parityLabel);
         stack.Children.Add(_parities);
+        stack.Children.Add(MacTheme.CreateFormLabel("Flow control"));
+        stack.Children.Add(_flow);
+        stack.Children.Add(_autoReconnect);
 
         stack.Children.Add(_openButton);
+        stack.Children.Add(MacTheme.CreateFormLabel("Device profiles"));
+        stack.Children.Add(_presets);
+        stack.Children.Add(_presetName);
+        var profileRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        profileRow.Children.Add(MacTheme.CreateSecondaryButton("Save profile", SavePreset));
+        profileRow.Children.Add(MacTheme.CreateSecondaryButton("Delete", DeletePreset));
+        stack.Children.Add(profileRow);
 
         _signalsTitle = new TextBlock
         {
@@ -415,7 +483,7 @@ public sealed class SettingsPanel
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(11),
             Padding = new Thickness(16),
-            Width = 270
+            Width = 286
         };
     }
 }

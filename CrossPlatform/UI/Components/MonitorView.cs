@@ -48,7 +48,9 @@ public sealed class MonitorView
     private readonly CheckBox _followTail = new() { FontSize = 12, IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _showHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly CheckBox _sendHex = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
-    private readonly CheckBox _newline = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly ComboBox _newline = new() { Width = 78, Height = 29 };
+    private readonly ComboBox _encoding = new() { Width = 82, Height = 29 };
+    private readonly ComboBox _quickCommands = new() { MinWidth = 160, MaxWidth = 280, Height = 29 };
 
     private readonly TextBlock _rxCountBadge = new() { FontSize = 11.5, FontWeight = FontWeight.SemiBold };
     private readonly TextBlock _txCountBadge = new() { FontSize = 11.5, FontWeight = FontWeight.SemiBold };
@@ -84,7 +86,8 @@ public sealed class MonitorView
     public bool IsTimelineView => _timeline.IsChecked == true;
     public bool IsShowHex => _showHex.IsChecked == true;
     public bool IsSendHex => _sendHex.IsChecked == true;
-    public bool IsNewLine => _newline.IsChecked == true;
+    public SerialLineEnding LineEnding => (SerialLineEnding)Math.Max(0, _newline.SelectedIndex);
+    public SerialTextEncoding TextEncoding => (SerialTextEncoding)Math.Max(0, _encoding.SelectedIndex);
 
     public string SendText
     {
@@ -108,7 +111,9 @@ public sealed class MonitorView
     {
         session.Draft = SendText;
         session.SendHex = IsSendHex;
-        session.AppendNewLine = IsNewLine;
+        session.AppendNewLine = LineEnding != SerialLineEnding.None;
+        session.LineEnding = LineEnding;
+        session.TextEncoding = TextEncoding;
         session.ShowHex = IsShowHex;
         session.ShowTimeline = IsTimelineView;
         session.PlotEnabled = IsPlotEnabled;
@@ -124,7 +129,8 @@ public sealed class MonitorView
         {
             _input.Text = session?.Draft ?? "";
             _sendHex.IsChecked = session?.SendHex == true;
-            _newline.IsChecked = session?.AppendNewLine == true;
+            _newline.SelectedIndex = (int)(session?.LineEnding ?? SerialLineEnding.None);
+            _encoding.SelectedIndex = (int)(session?.TextEncoding ?? SerialTextEncoding.Utf8);
             _showHex.IsChecked = session?.ShowHex == true;
             _timeline.IsChecked = session?.ShowTimeline == true;
             _plotToggle.IsChecked = session?.PlotEnabled == true;
@@ -141,7 +147,8 @@ public sealed class MonitorView
     {
         _input.TextChanged += (_, _) => { if (!_restoringSession) ComposerChanged?.Invoke(); };
         _sendHex.IsCheckedChanged += (_, _) => { if (!_restoringSession) ComposerChanged?.Invoke(); };
-        _newline.IsCheckedChanged += (_, _) => { if (!_restoringSession) ComposerChanged?.Invoke(); };
+        _newline.SelectionChanged += (_, _) => { if (!_restoringSession) ComposerChanged?.Invoke(); };
+        _encoding.SelectionChanged += (_, _) => { if (!_restoringSession) ComposerChanged?.Invoke(); };
         _showHex.IsCheckedChanged += (_, _) => HexDisplayToggled?.Invoke(IsShowHex);
         _timeline.IsCheckedChanged += (_, _) =>
         {
@@ -153,9 +160,30 @@ public sealed class MonitorView
             _searchOffset = 0;
             _searchStatus.Text = string.Empty;
         };
+        _newline.ItemsSource = new[] { "None", "CR", "LF", "CRLF" };
+        _encoding.ItemsSource = new[] { "UTF-8", "ASCII", "Latin-1", "GBK" };
+        _newline.SelectedIndex = 0;
+        _encoding.SelectedIndex = 0;
+        RefreshQuickCommands();
         Control = BuildView();
         ApplyTheme();
         RefreshLanguage();
+    }
+
+    private void RefreshQuickCommands() => _quickCommands.ItemsSource = SerialCommandStore.Load().ToArray();
+    public void RememberCommand(string command)
+    {
+        try { SerialCommandStore.Remember(command); RefreshQuickCommands(); }
+        catch (System.IO.IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+    private void RunQuickCommand()
+    {
+        if (_quickCommands.SelectedItem is string command)
+        {
+            SendText = command;
+            SendRequested?.Invoke();
+        }
     }
 
     public void UpdateCounts(long rxCount, long txCount, int visibleBytes = 0,
@@ -190,7 +218,7 @@ public sealed class MonitorView
         if (_findNextButton != null) _findNextButton.Content = I18n.T("FindNext");
         _showHex.Content = I18n.T("HexDisplay");
         _sendHex.Content = I18n.T("HexSend");
-        _newline.Content = I18n.T("NewLine");
+        // Line-ending control uses a fixed protocol notation (CR/LF/CRLF).
         _output.PlaceholderText = I18n.T("ReceivePlaceholder");
         _input.PlaceholderText = I18n.T("SendPlaceholder");
     }
@@ -362,7 +390,7 @@ public sealed class MonitorView
         // 2. Send Control Card
         var sendGrid = new Grid
         {
-            RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"),
             RowSpacing = 8
         };
 
@@ -395,6 +423,7 @@ public sealed class MonitorView
         };
         sendHeaderActions.Children.Add(_sendHex);
         sendHeaderActions.Children.Add(_newline);
+        sendHeaderActions.Children.Add(_encoding);
         _importSendBtn = MacTheme.CreateSecondaryButton(I18n.T("Import"), () => ImportFileRequested?.Invoke());
         _clearSendBtn = MacTheme.CreateSecondaryButton(I18n.T("ClearSend"), () => ClearSendRequested?.Invoke());
         sendHeaderActions.Children.Add(_importSendBtn);
@@ -403,7 +432,13 @@ public sealed class MonitorView
         sendHeaderGrid.Children.Add(sendHeaderActions);
         sendGrid.Children.Add(sendHeaderGrid);
 
-        Grid.SetRow(_input, 1);
+        var quickRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7 };
+        quickRow.Children.Add(_quickCommands);
+        quickRow.Children.Add(MacTheme.CreateSecondaryButton("Save command", () => RememberCommand(SendText)));
+        quickRow.Children.Add(MacTheme.CreateSecondaryButton("Run", RunQuickCommand));
+        Grid.SetRow(quickRow, 1);
+        sendGrid.Children.Add(quickRow);
+        Grid.SetRow(_input, 2);
         sendGrid.Children.Add(_input);
 
         var sendActionBar = new Grid
@@ -438,7 +473,7 @@ public sealed class MonitorView
         Grid.SetColumn(_sendButton, 1);
         sendActionBar.Children.Add(_sendButton);
 
-        Grid.SetRow(sendActionBar, 2);
+        Grid.SetRow(sendActionBar, 3);
         sendGrid.Children.Add(sendActionBar);
 
         _sendCardBorder = MacTheme.CreateCard(sendGrid);

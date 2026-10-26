@@ -28,6 +28,7 @@ public sealed class MainWindow : Window
     private SerialSession? _displayedSession;
     private readonly DispatcherTimer _receiveRenderTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
     private bool _receiveDirty;
+    private readonly DispatcherTimer _reconnectTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly TopNavBar _topNav = new();
     private readonly MonitorView _monitor = new();
     private readonly SettingsPanel _settings = new();
@@ -57,10 +58,12 @@ public sealed class MainWindow : Window
         WireEvents();
 
         _receiveRenderTimer.Tick += (_, _) => { if (_receiveDirty) RenderReceived(); };
-        Opened += (_, _) => { _receiveRenderTimer.Start(); _portScanner.StartPortScanning(); };
+        _reconnectTimer.Tick += (_, _) => TryReconnectSessions();
+        Opened += (_, _) => { _receiveRenderTimer.Start(); _portScanner.StartPortScanning(); _reconnectTimer.Start(); };
         Closed += (_, _) =>
         {
             _receiveRenderTimer.Stop();
+            _reconnectTimer.Stop();
             _sessions.Dispose();
             _portScanner.Dispose();
         };
@@ -208,6 +211,7 @@ public sealed class MainWindow : Window
                 session.SetSignals(rts, dtr);
         };
         _settings.PeriodicChanged += HandlePeriodicChanged;
+        _settings.AutoReconnectChanged += enabled => { if (_sessions.Active is { } session) session.AutoReconnect = enabled; };
 
         _portScanner.ErrorOccurred += SetStatusRaw;
         _portScanner.PortsScanned += ports =>
@@ -332,6 +336,7 @@ public sealed class MainWindow : Window
             session.Changed += OnSessionChanged;
             session.ConnectionChanged += OnSessionConnectionChanged;
             session.ErrorOccurred += OnSessionError;
+            session.AutoReconnect = _settings.AutoReconnectEnabled;
             SerialProfileStore.Save(config);
             SetStatus("StatusOpen", config.PortName);
             RefreshSessionPicker();
@@ -340,6 +345,24 @@ public sealed class MainWindow : Window
         else if (error != null)
         {
             _ = MacDialog.ShowAlertAsync(this, error);
+        }
+    }
+
+    private void TryReconnectSessions()
+    {
+        var available = _portScanner.GetAvailablePorts();
+        foreach (var session in _sessions.Sessions.ToArray())
+        {
+            session.Service.CheckPorts();
+            if (session.IsOpen || !session.AutoReconnect ||
+                !available.Contains(session.Config.PortName, StringComparer.OrdinalIgnoreCase))
+                continue;
+            if (session.TryReconnect(DateTimeOffset.UtcNow, out _))
+            {
+                if (ReferenceEquals(session, _sessions.Active))
+                    SetStatus("StatusOpen", session.Config.PortName);
+                RefreshSessionPicker();
+            }
         }
     }
 
@@ -375,7 +398,7 @@ public sealed class MainWindow : Window
         _displayedSession = session;
         _monitor.ApplySession(session);
         if (session != null)
-            _settings.ApplySession(session.Config, session.RepeatEnabled, session.RepeatIntervalMs);
+            _settings.ApplySession(session.Config, session.RepeatEnabled, session.RepeatIntervalMs, session.AutoReconnect);
         else
             _settings.ResetPeriodic();
 
@@ -414,7 +437,7 @@ public sealed class MainWindow : Window
                 ? SerialTraceFormatter.Format(session.Trace)
                 : _monitor.IsShowHex
                     ? SerialDataConverter.ToHexString(bytes)
-                    : SerialDataConverter.ToUtf8String(bytes);
+                    : SerialDataConverter.ToTextString(bytes, session.TextEncoding);
         _monitor.UpdatePlot(session?.Telemetry);
         UpdateCounts();
     }
@@ -433,7 +456,7 @@ public sealed class MainWindow : Window
         if (!success && error != null && ReferenceEquals(session, _sessions.Active))
             _ = MacDialog.ShowAlertAsync(this, error);
         if (success && ReferenceEquals(session, _sessions.Active))
-            UpdateCounts();
+        { _monitor.RememberCommand(session.Draft); UpdateCounts(); }
     }
 
     private void HandleClearReceived()
